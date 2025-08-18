@@ -12,7 +12,7 @@ from torch import Tensor
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from typing import Any, Dict, List, Optional
 
-from src.core import YAMLConfig, yaml_utils
+from rtdetrv2.core import YAMLConfig, yaml_utils
 
 __all__ = ["profile_stats"]
 
