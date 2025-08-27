@@ -9,13 +9,13 @@ Copyright(c) 2023 lyuwenyu. All Rights Reserved.
 import atexit
 import os
 import random
+import time
 
 import numpy as np
 import torch
 import torch.backends.cudnn
-import torch.distributed
+import torch.distributed as tdist
 import torch.nn as nn
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.nn.parallel import DataParallel as DP
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DistributedSampler
@@ -42,16 +42,14 @@ def setup_distributed(
         LOCAL_RANK = int(os.getenv("LOCAL_RANK", -1))
         WORLD_SIZE = int(os.getenv("WORLD_SIZE", 1))
 
-        # torch.distributed.init_process_group(backend=backend, init_method='env://')
-        torch.distributed.init_process_group(init_method="env://")
-        torch.distributed.barrier()
+        tdist.init_process_group(init_method="env://")
 
-        rank = torch.distributed.get_rank()
-        torch.cuda.set_device(rank)
+        torch.cuda.set_device(get_rank())
         torch.cuda.empty_cache()
+
         enabled_dist = True
         print("Initialized distributed mode...")
-
+        barrier()
     except:
         enabled_dist = False
         print("Not init distributed mode.")
@@ -87,9 +85,9 @@ def setup_print(is_main, method="builtin"):
 
 
 def is_dist_available_and_initialized():
-    if not torch.distributed.is_available():
+    if not tdist.is_available():
         return False
-    if not torch.distributed.is_initialized():
+    if not tdist.is_initialized():
         return False
     return True
 
@@ -98,24 +96,34 @@ def is_dist_available_and_initialized():
 def cleanup():
     """cleanup distributed environment"""
     if is_dist_available_and_initialized():
-        torch.distributed.barrier()
-        torch.distributed.destroy_process_group()
+        barrier()
+        tdist.destroy_process_group()
 
 
 def get_rank():
     if not is_dist_available_and_initialized():
         return 0
-    return torch.distributed.get_rank()
+    return tdist.get_rank()
 
 
 def get_world_size():
     if not is_dist_available_and_initialized():
         return 1
-    return torch.distributed.get_world_size()
+    return tdist.get_world_size()
 
 
 def is_main_process():
     return get_rank() == 0
+
+
+def barrier():
+    """
+    Helper function to synchronize (barrier) among all processes when
+    using distributed training
+    """
+    if not is_dist_available_and_initialized():
+        return
+    tdist.barrier()
 
 
 def save_on_master(*args, **kwargs):
@@ -202,7 +210,7 @@ def reduce_dict(data, avg=True):
             values.append(data[k])
 
         values = torch.stack(values, dim=0)
-        torch.distributed.all_reduce(values)
+        tdist.all_reduce(values)
 
         if avg is True:
             values /= world_size
@@ -222,11 +230,8 @@ def all_gather(data):
     if world_size == 1:
         return [data]
     data_list = [None] * world_size
-    torch.distributed.all_gather_object(data_list, data)
+    tdist.all_gather_object(data_list, data)
     return data_list
-
-
-import time
 
 
 def sync_time():
