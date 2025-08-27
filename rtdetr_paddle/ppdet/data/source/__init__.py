@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .coco import *
-from .voc import *
 from .category import *
+from .coco import *
 from .dataset import ImageFolder
+from .voc import *

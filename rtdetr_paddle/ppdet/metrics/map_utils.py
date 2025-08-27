@@ -12,49 +12,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import itertools
 import os
 import sys
+
 import numpy as np
-import itertools
 
 from ppdet.utils.logger import setup_logger
+
 logger = setup_logger(__name__)
 
 __all__ = [
-    'draw_pr_curve',
-    'bbox_area',
-    'jaccard_overlap',
-    'prune_zero_padding',
-    'DetectionMAP',
-    'ap_per_class',
-    'compute_ap',
+    "draw_pr_curve",
+    "bbox_area",
+    "jaccard_overlap",
+    "prune_zero_padding",
+    "DetectionMAP",
+    "ap_per_class",
+    "compute_ap",
 ]
 
 
-def draw_pr_curve(precision,
-                  recall,
-                  iou=0.5,
-                  out_dir='pr_curve',
-                  file_name='precision_recall_curve.jpg'):
+def draw_pr_curve(
+    precision,
+    recall,
+    iou=0.5,
+    out_dir="pr_curve",
+    file_name="precision_recall_curve.jpg",
+):
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     output_path = os.path.join(out_dir, file_name)
     try:
         import matplotlib.pyplot as plt
     except Exception as e:
-        logger.error('Matplotlib not found, plaese install matplotlib.'
-                     'for example: `pip install matplotlib`.')
+        logger.error(
+            "Matplotlib not found, plaese install matplotlib."
+            "for example: `pip install matplotlib`."
+        )
         raise e
     plt.cla()
-    plt.figure('P-R Curve')
-    plt.title('Precision/Recall Curve(IoU={})'.format(iou))
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
+    plt.figure("P-R Curve")
+    plt.title("Precision/Recall Curve(IoU={})".format(iou))
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
     plt.grid(True)
     plt.plot(recall, precision)
     plt.savefig(output_path)
@@ -64,7 +67,7 @@ def bbox_area(bbox, is_bbox_normalized):
     """
     Calculate area of a bounding box
     """
-    norm = 1. - float(is_bbox_normalized)
+    norm = 1.0 - float(is_bbox_normalized)
     width = bbox[2] - bbox[0] + norm
     height = bbox[3] - bbox[1] + norm
     return width * height
@@ -74,15 +77,15 @@ def jaccard_overlap(pred, gt, is_bbox_normalized=False):
     """
     Calculate jaccard overlap ratio between two bounding box
     """
-    if pred[0] >= gt[2] or pred[2] <= gt[0] or \
-        pred[1] >= gt[3] or pred[3] <= gt[1]:
-        return 0.
+    if pred[0] >= gt[2] or pred[2] <= gt[0] or pred[1] >= gt[3] or pred[3] <= gt[1]:
+        return 0.0
     inter_xmin = max(pred[0], gt[0])
     inter_ymin = max(pred[1], gt[1])
     inter_xmax = min(pred[2], gt[2])
     inter_ymax = min(pred[3], gt[3])
-    inter_size = bbox_area([inter_xmin, inter_ymin, inter_xmax, inter_ymax],
-                           is_bbox_normalized)
+    inter_size = bbox_area(
+        [inter_xmin, inter_ymin, inter_xmax, inter_ymax], is_bbox_normalized
+    )
     pred_size = bbox_area(pred, is_bbox_normalized)
     gt_size = bbox_area(gt, is_bbox_normalized)
     overlap = float(inter_size) / (pred_size + gt_size - inter_size)
@@ -95,8 +98,11 @@ def prune_zero_padding(gt_box, gt_label, difficult=None):
         if (gt_box[i] == 0).all():
             break
         valid_cnt += 1
-    return (gt_box[:valid_cnt], gt_label[:valid_cnt], difficult[:valid_cnt]
-            if difficult is not None else None)
+    return (
+        gt_box[:valid_cnt],
+        gt_label[:valid_cnt],
+        difficult[:valid_cnt] if difficult is not None else None,
+    )
 
 
 class DetectionMAP(object):
@@ -107,8 +113,8 @@ class DetectionMAP(object):
     Args:
         class_num (int): The class number.
         overlap_thresh (float): The threshold of overlap
-            ratio between prediction bounding box and 
-            ground truth bounding box for deciding 
+            ratio between prediction bounding box and
+            ground truth bounding box for deciding
             true/false positive. Default 0.5.
         map_type (str): Calculation method of mean average
             precision, currently support '11point' and
@@ -122,19 +128,21 @@ class DetectionMAP(object):
             P-R Curve or not.
     """
 
-    def __init__(self,
-                 class_num,
-                 overlap_thresh=0.5,
-                 map_type='11point',
-                 is_bbox_normalized=False,
-                 evaluate_difficult=False,
-                 catid2name=None,
-                 classwise=False):
+    def __init__(
+        self,
+        class_num,
+        overlap_thresh=0.5,
+        map_type="11point",
+        is_bbox_normalized=False,
+        evaluate_difficult=False,
+        catid2name=None,
+        classwise=False,
+    ):
         self.class_num = class_num
         self.overlap_thresh = overlap_thresh
-        assert map_type in ['11point', 'integral'], \
-                "map_type currently only support '11point' "\
-                "and 'integral'"
+        assert map_type in ["11point", "integral"], (
+            "map_type currently only support '11point' and 'integral'"
+        )
         self.map_type = map_type
         self.is_bbox_normalized = is_bbox_normalized
         self.evaluate_difficult = evaluate_difficult
@@ -168,15 +176,15 @@ class DetectionMAP(object):
                     if len(gt_box[i]) == 8:
                         overlap = calc_rbox_iou(pred, gt_box[i])
                     else:
-                        overlap = jaccard_overlap(pred, gt_box[i],
-                                                  self.is_bbox_normalized)
+                        overlap = jaccard_overlap(
+                            pred, gt_box[i], self.is_bbox_normalized
+                        )
                     if overlap > max_overlap:
                         max_overlap = overlap
                         max_idx = i
 
             if max_overlap > self.overlap_thresh:
-                if self.evaluate_difficult or \
-                        int(np.array(difficult[max_idx])) == 0:
+                if self.evaluate_difficult or int(np.array(difficult[max_idx])) == 0:
                     if not visited[max_idx]:
                         self.class_score_poss[int(l)].append([s, 1.0])
                         visited[max_idx] = True
@@ -197,18 +205,17 @@ class DetectionMAP(object):
         """
         Accumulate metric results and calculate mAP
         """
-        mAP = 0.
+        mAP = 0.0
         valid_cnt = 0
         eval_results = []
-        for score_pos, count in zip(self.class_score_poss,
-                                    self.class_gt_counts):
-            if count == 0: continue
+        for score_pos, count in zip(self.class_score_poss, self.class_gt_counts):
+            if count == 0:
+                continue
             if len(score_pos) == 0:
                 valid_cnt += 1
                 continue
 
-            accum_tp_list, accum_fp_list = \
-                    self._get_tp_fp_accum(score_pos)
+            accum_tp_list, accum_fp_list = self._get_tp_fp_accum(score_pos)
             precision = []
             recall = []
             for ac_tp, ac_fp in zip(accum_tp_list, accum_fp_list):
@@ -216,12 +223,12 @@ class DetectionMAP(object):
                 recall.append(float(ac_tp) / count)
 
             one_class_ap = 0.0
-            if self.map_type == '11point':
-                max_precisions = [0.] * 11
+            if self.map_type == "11point":
+                max_precisions = [0.0] * 11
                 start_idx = len(precision) - 1
                 for j in range(10, -1, -1):
                     for i in range(start_idx, -1, -1):
-                        if recall[i] < float(j) / 10.:
+                        if recall[i] < float(j) / 10.0:
                             start_idx = i
                             if j > 0:
                                 max_precisions[j - 1] = max_precisions[j]
@@ -229,12 +236,13 @@ class DetectionMAP(object):
                         else:
                             if max_precisions[j] < precision[i]:
                                 max_precisions[j] = precision[i]
-                one_class_ap = sum(max_precisions) / 11.
+                one_class_ap = sum(max_precisions) / 11.0
                 mAP += one_class_ap
                 valid_cnt += 1
-            elif self.map_type == 'integral':
+            elif self.map_type == "integral":
                 import math
-                prev_recall = 0.
+
+                prev_recall = 0.0
                 for i in range(len(precision)):
                     recall_gap = math.fabs(recall[i] - prev_recall)
                     if recall_gap > 1e-6:
@@ -245,12 +253,14 @@ class DetectionMAP(object):
             else:
                 logger.error("Unspported mAP type {}".format(self.map_type))
                 sys.exit(1)
-            eval_results.append({
-                'class': self.classes[valid_cnt - 1],
-                'ap': one_class_ap,
-                'precision': precision,
-                'recall': recall,
-            })
+            eval_results.append(
+                {
+                    "class": self.classes[valid_cnt - 1],
+                    "ap": one_class_ap,
+                    "precision": precision,
+                    "recall": recall,
+                }
+            )
         self.eval_results = eval_results
         self.mAP = mAP / float(valid_cnt) if valid_cnt > 0 else mAP
 
@@ -266,33 +276,38 @@ class DetectionMAP(object):
                 from terminaltables import AsciiTable
             except Exception as e:
                 logger.error(
-                    'terminaltables not found, plaese install terminaltables. '
-                    'for example: `pip install terminaltables`.')
+                    "terminaltables not found, plaese install terminaltables. "
+                    "for example: `pip install terminaltables`."
+                )
                 raise e
             results_per_category = []
             for eval_result in self.eval_results:
                 results_per_category.append(
-                    (str(eval_result['class']),
-                     '{:0.3f}'.format(float(eval_result['ap']))))
+                    (
+                        str(eval_result["class"]),
+                        "{:0.3f}".format(float(eval_result["ap"])),
+                    )
+                )
                 draw_pr_curve(
-                    eval_result['precision'],
-                    eval_result['recall'],
-                    out_dir='voc_pr_curve',
-                    file_name='{}_precision_recall_curve.jpg'.format(
-                        eval_result['class']))
+                    eval_result["precision"],
+                    eval_result["recall"],
+                    out_dir="voc_pr_curve",
+                    file_name="{}_precision_recall_curve.jpg".format(
+                        eval_result["class"]
+                    ),
+                )
 
             num_columns = min(6, len(results_per_category) * 2)
             results_flatten = list(itertools.chain(*results_per_category))
-            headers = ['category', 'AP'] * (num_columns // 2)
-            results_2d = itertools.zip_longest(* [
-                results_flatten[i::num_columns] for i in range(num_columns)
-            ])
+            headers = ["category", "AP"] * (num_columns // 2)
+            results_2d = itertools.zip_longest(
+                *[results_flatten[i::num_columns] for i in range(num_columns)]
+            )
             table_data = [headers]
             table_data += [result for result in results_2d]
             table = AsciiTable(table_data)
-            logger.info('Per-category of VOC AP: \n{}'.format(table.table))
-            logger.info(
-                "per-category PR curve has output to voc_pr_curve folder.")
+            logger.info("Per-category of VOC AP: \n{}".format(table.table))
+            logger.info("per-category PR curve has output to voc_pr_curve folder.")
         return self.mAP
 
     def _get_tp_fp_accum(self, score_pos_list):
@@ -305,7 +320,7 @@ class DetectionMAP(object):
         accum_fp = 0
         accum_tp_list = []
         accum_fp_list = []
-        for (score, pos) in sorted_list:
+        for score, pos in sorted_list:
             accum_tp += int(pos)
             accum_tp_list.append(accum_tp)
             accum_fp += 1 - int(pos)
@@ -317,15 +332,19 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
     """
     Computes the average precision, given the recall and precision curves.
     Method originally from https://github.com/rafaelpadilla/Object-Detection-Metrics.
-    
+
     Args:
         tp (list): True positives.
         conf (list): Objectness value from 0-1.
         pred_cls (list): Predicted object classes.
         target_cls (list): Target object classes.
     """
-    tp, conf, pred_cls, target_cls = np.array(tp), np.array(conf), np.array(
-        pred_cls), np.array(target_cls)
+    tp, conf, pred_cls, target_cls = (
+        np.array(tp),
+        np.array(conf),
+        np.array(pred_cls),
+        np.array(target_cls),
+    )
 
     # Sort by objectness
     i = np.argsort(-conf)
@@ -363,15 +382,14 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
             # AP from recall-precision curve
             ap.append(compute_ap(recall_curve, precision_curve))
 
-    return np.array(ap), unique_classes.astype('int32'), np.array(r), np.array(
-        p)
+    return np.array(ap), unique_classes.astype("int32"), np.array(r), np.array(p)
 
 
 def compute_ap(recall, precision):
     """
     Computes the average precision, given the recall and precision curves.
     Code originally from https://github.com/rbgirshick/py-faster-rcnn.
-    
+
     Args:
         recall (list): The recall curve.
         precision (list): The precision curve.
@@ -381,8 +399,8 @@ def compute_ap(recall, precision):
     """
     # correct AP calculation
     # first append sentinel values at the end
-    mrec = np.concatenate(([0.], recall, [1.]))
-    mpre = np.concatenate(([0.], precision, [0.]))
+    mrec = np.concatenate(([0.0], recall, [1.0]))
+    mpre = np.concatenate(([0.0], precision, [0.0]))
 
     # compute the precision envelope
     for i in range(mpre.size - 1, 0, -1):

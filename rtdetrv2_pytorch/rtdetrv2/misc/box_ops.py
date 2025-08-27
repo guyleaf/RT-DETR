@@ -1,10 +1,10 @@
-"""Copyright(c) 2023 lyuwenyu. All Rights Reserved.
-"""
+"""Copyright(c) 2023 lyuwenyu. All Rights Reserved."""
+
+from typing import List, Tuple
 
 import torch
 import torchvision
-from torch import Tensor 
-from typing import List, Tuple
+from torch import Tensor
 
 
 def generalized_box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
@@ -23,8 +23,8 @@ def elementwise_box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
         iou, [N, ]
         union, [N, ]
     """
-    area1 = torchvision.ops.box_area(boxes1) # [N, ]
-    area2 = torchvision.ops.box_area(boxes2) # [N, ]
+    area1 = torchvision.ops.box_area(boxes1)  # [N, ]
+    area2 = torchvision.ops.box_area(boxes2)  # [N, ]
     lt = torch.max(boxes1[:, :2], boxes2[:, :2])  # [N, 2]
     rb = torch.min(boxes1[:, 2:], boxes2[:, 2:])  # [N, 2]
     wh = (rb - lt).clamp(min=0)  # [N, 2]
@@ -45,8 +45,8 @@ def elementwise_generalized_box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
     assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
     assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
     iou, union = elementwise_box_iou(boxes1, boxes2)
-    lt = torch.min(boxes1[:, :2], boxes2[:, :2]) # [N, 2]
-    rb = torch.max(boxes1[:, 2:], boxes2[:, 2:]) # [N, 2]
+    lt = torch.min(boxes1[:, :2], boxes2[:, :2])  # [N, 2]
+    rb = torch.max(boxes1[:, 2:], boxes2[:, 2:])  # [N, 2]
     wh = (rb - lt).clamp(min=0)  # [N, 2]
     area = wh[:, 0] * wh[:, 1]
     return iou - (area - union) / area
@@ -64,10 +64,10 @@ def check_point_inside_box(points: Tensor, boxes: Tensor, eps=1e-9) -> Tensor:
     x1, y1, x2, y2 = [x.unsqueeze(0) for x in boxes.unbind(-1)]
 
     l = x - x1
-    t = y - y1 
+    t = y - y1
     r = x2 - x
     b = y2 - y
-    
+
     ltrb = torch.stack([l, t, r, b], dim=-1)
     mask = ltrb.min(dim=-1).values > eps
 

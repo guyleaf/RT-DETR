@@ -4,13 +4,13 @@ copy and modified https://github.com/pytorch/vision/blob/main/references/detecti
 Copyright(c) 2023 lyuwenyu. All Rights Reserved.
 """
 
-
+import faster_coco_eval.core.mask as mask_util
 import torch
 import torch.utils.data
 import torchvision
 import torchvision.transforms.functional as TVF
 from faster_coco_eval import COCO
-import faster_coco_eval.core.mask as mask_util
+
 
 def convert_coco_poly_to_mask(segmentations, height, width):
     masks = []
@@ -137,7 +137,7 @@ def convert_to_coco_api(ds):
         # TODO (by lyuwenyu), load image and targets before `transforms`
         img, targets = ds.load_item(img_idx)
         width, height = img.size
-        
+
         image_id = targets["image_id"].item()
         img_dict = {}
         img_dict["id"] = image_id
@@ -145,7 +145,7 @@ def convert_to_coco_api(ds):
         img_dict["height"] = height
         dataset["images"].append(img_dict)
         bboxes = targets["boxes"].clone()
-        bboxes[:, 2:] -= bboxes[:, :2] # xyxy -> xywh
+        bboxes[:, 2:] -= bboxes[:, :2]  # xyxy -> xywh
         bboxes = bboxes.tolist()
         labels = targets["labels"].tolist()
         areas = targets["area"].tolist()
@@ -190,5 +190,3 @@ def get_coco_api_from_dataset(dataset):
     if isinstance(dataset, torchvision.datasets.CocoDetection):
         return dataset.coco
     return convert_to_coco_api(dataset)
-
-

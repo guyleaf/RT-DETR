@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import typing
 
@@ -25,14 +23,17 @@ except Exception:
 
 import cv2
 import numpy as np
-from .operators import register_op, BaseOperator, Resize
+
 from ppdet.utils.logger import setup_logger
+
+from .operators import BaseOperator, Resize, register_op
+
 logger = setup_logger(__name__)
 
 __all__ = [
-    'PadBatch',
-    'BatchRandomResize',
-    'PadGT',
+    "PadBatch",
+    "BatchRandomResize",
+    "PadGT",
 ]
 
 
@@ -58,41 +59,46 @@ class PadBatch(BaseOperator):
         coarsest_stride = self.pad_to_stride
 
         # multi scale input is nested list
-        if isinstance(samples,
-                      typing.Sequence) and len(samples) > 0 and isinstance(
-                          samples[0], typing.Sequence):
+        if (
+            isinstance(samples, typing.Sequence)
+            and len(samples) > 0
+            and isinstance(samples[0], typing.Sequence)
+        ):
             inner_samples = samples[0]
         else:
             inner_samples = samples
 
-        max_shape = np.array(
-            [data['image'].shape for data in inner_samples]).max(axis=0)
+        max_shape = np.array([data["image"].shape for data in inner_samples]).max(
+            axis=0
+        )
         if coarsest_stride > 0:
             max_shape[1] = int(
-                np.ceil(max_shape[1] / coarsest_stride) * coarsest_stride)
+                np.ceil(max_shape[1] / coarsest_stride) * coarsest_stride
+            )
             max_shape[2] = int(
-                np.ceil(max_shape[2] / coarsest_stride) * coarsest_stride)
+                np.ceil(max_shape[2] / coarsest_stride) * coarsest_stride
+            )
 
         for data in inner_samples:
-            im = data['image']
+            im = data["image"]
             im_c, im_h, im_w = im.shape[:]
-            padding_im = np.zeros(
-                (im_c, max_shape[1], max_shape[2]), dtype=np.float32)
+            padding_im = np.zeros((im_c, max_shape[1], max_shape[2]), dtype=np.float32)
             padding_im[:, :im_h, :im_w] = im
-            data['image'] = padding_im
-            if 'semantic' in data and data['semantic'] is not None:
-                semantic = data['semantic']
+            data["image"] = padding_im
+            if "semantic" in data and data["semantic"] is not None:
+                semantic = data["semantic"]
                 padding_sem = np.zeros(
-                    (1, max_shape[1], max_shape[2]), dtype=np.float32)
+                    (1, max_shape[1], max_shape[2]), dtype=np.float32
+                )
                 padding_sem[:, :im_h, :im_w] = semantic
-                data['semantic'] = padding_sem
-            if 'gt_segm' in data and data['gt_segm'] is not None:
-                gt_segm = data['gt_segm']
+                data["semantic"] = padding_sem
+            if "gt_segm" in data and data["gt_segm"] is not None:
+                gt_segm = data["gt_segm"]
                 padding_segm = np.zeros(
-                    (gt_segm.shape[0], max_shape[1], max_shape[2]),
-                    dtype=np.uint8)
+                    (gt_segm.shape[0], max_shape[1], max_shape[2]), dtype=np.uint8
+                )
                 padding_segm[:, :im_h, :im_w] = gt_segm
-                data['gt_segm'] = padding_segm
+                data["gt_segm"] = padding_segm
 
         return samples
 
@@ -109,12 +115,14 @@ class BatchRandomResize(BaseOperator):
         random_interp (bool): whether random select interpolation method
     """
 
-    def __init__(self,
-                 target_size,
-                 keep_ratio,
-                 interp=cv2.INTER_NEAREST,
-                 random_size=True,
-                 random_interp=False):
+    def __init__(
+        self,
+        target_size,
+        keep_ratio,
+        interp=cv2.INTER_NEAREST,
+        random_size=True,
+        random_interp=False,
+    ):
         super(BatchRandomResize, self).__init__()
         self.keep_ratio = keep_ratio
         self.interps = [
@@ -125,12 +133,15 @@ class BatchRandomResize(BaseOperator):
             cv2.INTER_LANCZOS4,
         ]
         self.interp = interp
-        assert isinstance(target_size, (
-            int, Sequence)), "target_size must be int, list or tuple"
+        assert isinstance(target_size, (int, Sequence)), (
+            "target_size must be int, list or tuple"
+        )
         if random_size and not isinstance(target_size, list):
             raise TypeError(
-                "Type of target_size is invalid when random_size is True. Must be List, now is {}".
-                format(type(target_size)))
+                "Type of target_size is invalid when random_size is True. Must be List, now is {}".format(
+                    type(target_size)
+                )
+            )
         self.target_size = target_size
         self.random_size = random_size
         self.random_interp = random_interp
@@ -167,13 +178,15 @@ class PadGT(BaseOperator):
         self.pad_img = pad_img
         self.minimum_gtnum = minimum_gtnum
 
-    def _impad(self,
-               img: np.ndarray,
-               *,
-               shape=None,
-               padding=None,
-               pad_val=0,
-               padding_mode='constant') -> np.ndarray:
+    def _impad(
+        self,
+        img: np.ndarray,
+        *,
+        shape=None,
+        padding=None,
+        pad_val=0,
+        padding_mode="constant",
+    ) -> np.ndarray:
         """Pad the given image to a certain shape or pad on all sides with
         specified padding mode and padding value.
 
@@ -215,11 +228,13 @@ class PadGT(BaseOperator):
 
         # check pad_val
         import numbers
+
         if isinstance(pad_val, tuple):
             assert len(pad_val) == img.shape[-1]
         elif not isinstance(pad_val, numbers.Number):
-            raise TypeError('pad_val must be a int or a tuple. '
-                            f'But received {type(pad_val)}')
+            raise TypeError(
+                f"pad_val must be a int or a tuple. But received {type(pad_val)}"
+            )
 
         # check padding
         if isinstance(padding, tuple) and len(padding) in [2, 4]:
@@ -228,17 +243,19 @@ class PadGT(BaseOperator):
         elif isinstance(padding, numbers.Number):
             padding = (padding, padding, padding, padding)
         else:
-            raise ValueError('Padding must be a int or a 2, or 4 element tuple.'
-                             f'But received {padding}')
+            raise ValueError(
+                "Padding must be a int or a 2, or 4 element tuple."
+                f"But received {padding}"
+            )
 
         # check padding mode
-        assert padding_mode in ['constant', 'edge', 'reflect', 'symmetric']
+        assert padding_mode in ["constant", "edge", "reflect", "symmetric"]
 
         border_type = {
-            'constant': cv2.BORDER_CONSTANT,
-            'edge': cv2.BORDER_REPLICATE,
-            'reflect': cv2.BORDER_REFLECT_101,
-            'symmetric': cv2.BORDER_REFLECT
+            "constant": cv2.BORDER_CONSTANT,
+            "edge": cv2.BORDER_REPLICATE,
+            "reflect": cv2.BORDER_REFLECT_101,
+            "symmetric": cv2.BORDER_REFLECT,
         }
         img = cv2.copyMakeBorder(
             img,
@@ -247,14 +264,15 @@ class PadGT(BaseOperator):
             padding[0],
             padding[2],
             border_type[padding_mode],
-            value=pad_val)
+            value=pad_val,
+        )
 
         return img
 
     def checkmaxshape(self, samples):
         maxh, maxw = 0, 0
         for sample in samples:
-            h, w = sample['im_shape']
+            h, w = sample["im_shape"]
             if h > maxh:
                 maxh = h
             if w > maxw:
@@ -262,61 +280,58 @@ class PadGT(BaseOperator):
         return (maxh, maxw)
 
     def __call__(self, samples, context=None):
-        num_max_boxes = max([len(s['gt_bbox']) for s in samples])
+        num_max_boxes = max([len(s["gt_bbox"]) for s in samples])
         num_max_boxes = max(self.minimum_gtnum, num_max_boxes)
         if self.pad_img:
             maxshape = self.checkmaxshape(samples)
         for sample in samples:
             if self.pad_img:
-                img = sample['image']
+                img = sample["image"]
                 padimg = self._impad(img, shape=maxshape)
-                sample['image'] = padimg
+                sample["image"] = padimg
             if self.return_gt_mask:
-                sample['pad_gt_mask'] = np.zeros(
-                    (num_max_boxes, 1), dtype=np.float32)
+                sample["pad_gt_mask"] = np.zeros((num_max_boxes, 1), dtype=np.float32)
             if num_max_boxes == 0:
                 continue
 
-            num_gt = len(sample['gt_bbox'])
+            num_gt = len(sample["gt_bbox"])
             pad_gt_class = np.zeros((num_max_boxes, 1), dtype=np.int32)
             pad_gt_bbox = np.zeros((num_max_boxes, 4), dtype=np.float32)
             if num_gt > 0:
-                pad_gt_class[:num_gt] = sample['gt_class']
-                pad_gt_bbox[:num_gt] = sample['gt_bbox']
-            sample['gt_class'] = pad_gt_class
-            sample['gt_bbox'] = pad_gt_bbox
+                pad_gt_class[:num_gt] = sample["gt_class"]
+                pad_gt_bbox[:num_gt] = sample["gt_bbox"]
+            sample["gt_class"] = pad_gt_class
+            sample["gt_bbox"] = pad_gt_bbox
             # pad_gt_mask
-            if 'pad_gt_mask' in sample:
-                sample['pad_gt_mask'][:num_gt] = 1
+            if "pad_gt_mask" in sample:
+                sample["pad_gt_mask"][:num_gt] = 1
             # gt_score
-            if 'gt_score' in sample:
+            if "gt_score" in sample:
                 pad_gt_score = np.zeros((num_max_boxes, 1), dtype=np.float32)
                 if num_gt > 0:
-                    pad_gt_score[:num_gt] = sample['gt_score']
-                sample['gt_score'] = pad_gt_score
-            if 'is_crowd' in sample:
+                    pad_gt_score[:num_gt] = sample["gt_score"]
+                sample["gt_score"] = pad_gt_score
+            if "is_crowd" in sample:
                 pad_is_crowd = np.zeros((num_max_boxes, 1), dtype=np.int32)
                 if num_gt > 0:
-                    pad_is_crowd[:num_gt] = sample['is_crowd']
-                sample['is_crowd'] = pad_is_crowd
-            if 'difficult' in sample:
+                    pad_is_crowd[:num_gt] = sample["is_crowd"]
+                sample["is_crowd"] = pad_is_crowd
+            if "difficult" in sample:
                 pad_diff = np.zeros((num_max_boxes, 1), dtype=np.int32)
                 if num_gt > 0:
-                    pad_diff[:num_gt] = sample['difficult']
-                sample['difficult'] = pad_diff
-            if 'gt_joints' in sample:
-                num_joints = sample['gt_joints'].shape[1]
+                    pad_diff[:num_gt] = sample["difficult"]
+                sample["difficult"] = pad_diff
+            if "gt_joints" in sample:
+                num_joints = sample["gt_joints"].shape[1]
                 pad_gt_joints = np.zeros(
-                    (num_max_boxes, num_joints, 3), dtype=np.float32)
+                    (num_max_boxes, num_joints, 3), dtype=np.float32
+                )
                 if num_gt > 0:
-                    pad_gt_joints[:num_gt] = sample['gt_joints']
-                sample['gt_joints'] = pad_gt_joints
-            if 'gt_areas' in sample:
+                    pad_gt_joints[:num_gt] = sample["gt_joints"]
+                sample["gt_joints"] = pad_gt_joints
+            if "gt_areas" in sample:
                 pad_gt_areas = np.zeros((num_max_boxes, 1), dtype=np.float32)
                 if num_gt > 0:
-                    pad_gt_areas[:num_gt, 0] = sample['gt_areas']
-                sample['gt_areas'] = pad_gt_areas
+                    pad_gt_areas[:num_gt, 0] = sample["gt_areas"]
+                sample["gt_areas"] = pad_gt_areas
         return samples
-
-
-

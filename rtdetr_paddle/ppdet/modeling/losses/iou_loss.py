@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
+
+import math
 
 import numpy as np
-import math
 import paddle
 
 from ppdet.core.workspace import register, serializable
+
 from ..bbox_utils import bbox_iou
 
-__all__ = ['IouLoss', 'GIoULoss', 'DIouLoss', 'SIoULoss']
+__all__ = ["IouLoss", "GIoULoss", "DIouLoss", "SIoULoss"]
 
 
 @register
@@ -40,12 +40,9 @@ class IouLoss(object):
         loss_square (bool): whether to square the iou term
     """
 
-    def __init__(self,
-                 loss_weight=2.5,
-                 giou=False,
-                 diou=False,
-                 ciou=False,
-                 loss_square=True):
+    def __init__(
+        self, loss_weight=2.5, giou=False, diou=False, ciou=False, loss_square=True
+    ):
         self.loss_weight = loss_weight
         self.giou = giou
         self.diou = diou
@@ -53,8 +50,7 @@ class IouLoss(object):
         self.loss_square = loss_square
 
     def __call__(self, pbox, gbox):
-        iou = bbox_iou(
-            pbox, gbox, giou=self.giou, diou=self.diou, ciou=self.ciou)
+        iou = bbox_iou(pbox, gbox, giou=self.giou, diou=self.diou, ciou=self.ciou)
         if self.loss_square:
             loss_iou = 1 - iou * iou
         else:
@@ -75,10 +71,10 @@ class GIoULoss(object):
         reduction (string): Options are "none", "mean" and "sum". default as none
     """
 
-    def __init__(self, loss_weight=1., eps=1e-10, reduction='none'):
+    def __init__(self, loss_weight=1.0, eps=1e-10, reduction="none"):
         self.loss_weight = loss_weight
         self.eps = eps
-        assert reduction in ('none', 'mean', 'sum')
+        assert reduction in ("none", "mean", "sum")
         self.reduction = reduction
 
     def bbox_overlap(self, box1, box2, eps=1e-10):
@@ -110,7 +106,7 @@ class GIoULoss(object):
 
         return iou, overlap, union
 
-    def __call__(self, pbox, gbox, iou_weight=1., loc_reweight=None):
+    def __call__(self, pbox, gbox, iou_weight=1.0, loc_reweight=None):
         x1, y1, x2, y2 = paddle.split(pbox, num_or_sections=4, axis=-1)
         x1g, y1g, x2g, y2g = paddle.split(gbox, num_or_sections=4, axis=-1)
         box1 = [x1, y1, x2, y2]
@@ -126,13 +122,12 @@ class GIoULoss(object):
         if loc_reweight is not None:
             loc_reweight = paddle.reshape(loc_reweight, shape=(-1, 1))
             loc_thresh = 0.9
-            giou = 1 - (1 - loc_thresh
-                        ) * miou - loc_thresh * miou * loc_reweight
+            giou = 1 - (1 - loc_thresh) * miou - loc_thresh * miou * loc_reweight
         else:
             giou = 1 - miou
-        if self.reduction == 'none':
+        if self.reduction == "none":
             loss = giou
-        elif self.reduction == 'sum':
+        elif self.reduction == "sum":
             loss = paddle.sum(giou * iou_weight)
         else:
             loss = paddle.mean(giou * iou_weight)
@@ -150,11 +145,11 @@ class DIouLoss(GIoULoss):
         use_complete_iou_loss (bool): whether to use complete iou loss
     """
 
-    def __init__(self, loss_weight=1., eps=1e-10, use_complete_iou_loss=True):
+    def __init__(self, loss_weight=1.0, eps=1e-10, use_complete_iou_loss=True):
         super(DIouLoss, self).__init__(loss_weight=loss_weight, eps=eps)
         self.use_complete_iou_loss = use_complete_iou_loss
 
-    def __call__(self, pbox, gbox, iou_weight=1.):
+    def __call__(self, pbox, gbox, iou_weight=1.0):
         x1, y1, x2, y2 = paddle.split(pbox, num_or_sections=4, axis=-1)
         x1g, y1g, x2g, y2g = paddle.split(gbox, num_or_sections=4, axis=-1)
         cx = (x1 + x2) / 2
@@ -183,10 +178,12 @@ class DIouLoss(GIoULoss):
         yc2 = paddle.maximum(y2, y2g)
 
         intsctk = (xkis2 - xkis1) * (ykis2 - ykis1)
-        intsctk = intsctk * paddle.greater_than(
-            xkis2, xkis1) * paddle.greater_than(ykis2, ykis1)
-        unionk = (x2 - x1) * (y2 - y1) + (x2g - x1g) * (y2g - y1g
-                                                        ) - intsctk + self.eps
+        intsctk = (
+            intsctk
+            * paddle.greater_than(xkis2, xkis1)
+            * paddle.greater_than(ykis2, ykis1)
+        )
+        unionk = (x2 - x1) * (y2 - y1) + (x2g - x1g) * (y2g - y1g) - intsctk + self.eps
         iouk = intsctk / unionk
 
         # DIOU term
@@ -200,7 +197,7 @@ class DIouLoss(GIoULoss):
             ar_gt = wg / hg
             ar_pred = w / h
             arctan = paddle.atan(ar_gt) - paddle.atan(ar_pred)
-            ar_loss = 4. / np.pi / np.pi * arctan * arctan
+            ar_loss = 4.0 / np.pi / np.pi * arctan * arctan
             alpha = ar_loss / (1 - iouk + ar_loss + self.eps)
             alpha.stop_gradient = True
             ciou_term = alpha * ar_loss
@@ -214,7 +211,7 @@ class DIouLoss(GIoULoss):
 @serializable
 class SIoULoss(GIoULoss):
     """
-    see https://arxiv.org/pdf/2205.12740.pdf 
+    see https://arxiv.org/pdf/2205.12740.pdf
     Args:
         loss_weight (float): siou loss weight, default as 1
         eps (float): epsilon to avoid divide by zero, default as 1e-10
@@ -222,7 +219,7 @@ class SIoULoss(GIoULoss):
         reduction (str): Options are "none", "mean" and "sum". default as none
     """
 
-    def __init__(self, loss_weight=1., eps=1e-10, theta=4., reduction='none'):
+    def __init__(self, loss_weight=1.0, eps=1e-10, theta=4.0, reduction="none"):
         super(SIoULoss, self).__init__(loss_weight=loss_weight, eps=eps)
         self.loss_weight = loss_weight
         self.eps = eps
@@ -263,33 +260,34 @@ class SIoULoss(GIoULoss):
         cw = paddle.maximum(cx, cxg) - paddle.minimum(cx, cxg)
 
         # angle cost
-        dist_intersection = paddle.sqrt((cx - cxg)**2 + (cy - cyg)**2)
+        dist_intersection = paddle.sqrt((cx - cxg) ** 2 + (cy - cyg) ** 2)
         sin_angle_alpha = ch / dist_intersection
         sin_angle_beta = cw / dist_intersection
         thred = paddle.pow(paddle.to_tensor(2), 0.5) / 2
         thred.stop_gradient = True
-        sin_alpha = paddle.where(sin_angle_alpha > thred, sin_angle_beta,
-                                 sin_angle_alpha)
+        sin_alpha = paddle.where(
+            sin_angle_alpha > thred, sin_angle_beta, sin_angle_alpha
+        )
         angle_cost = paddle.cos(paddle.asin(sin_alpha) * 2 - math.pi / 2)
 
         # distance cost
         gamma = 2 - angle_cost
         # gamma.stop_gradient = True
-        beta_x = ((cxg - cx) / cw_out)**2
-        beta_y = ((cyg - cy) / ch_out)**2
-        dist_cost = 1 - paddle.exp(-gamma * beta_x) + 1 - paddle.exp(-gamma *
-                                                                     beta_y)
+        beta_x = ((cxg - cx) / cw_out) ** 2
+        beta_y = ((cyg - cy) / ch_out) ** 2
+        dist_cost = 1 - paddle.exp(-gamma * beta_x) + 1 - paddle.exp(-gamma * beta_y)
 
         # shape cost
         omega_w = paddle.abs(w - wg) / paddle.maximum(w, wg)
         omega_h = paddle.abs(hg - h) / paddle.maximum(h, hg)
-        omega = (1 - paddle.exp(-omega_w))**self.theta + (
-            1 - paddle.exp(-omega_h))**self.theta
+        omega = (1 - paddle.exp(-omega_w)) ** self.theta + (
+            1 - paddle.exp(-omega_h)
+        ) ** self.theta
         siou_loss = 1 - iou + (omega + dist_cost) / 2
 
-        if self.reduction == 'mean':
+        if self.reduction == "mean":
             siou_loss = paddle.mean(siou_loss)
-        elif self.reduction == 'sum':
+        elif self.reduction == "sum":
             siou_loss = paddle.sum(siou_loss)
 
         return siou_loss * self.loss_weight

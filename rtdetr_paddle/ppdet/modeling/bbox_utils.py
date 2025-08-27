@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import math
-import paddle
+
 import numpy as np
+import paddle
 
 
 def bbox2delta(src_boxes, tgt_boxes, weights=[1.0, 1.0, 1.0, 1.0]):
-    """Encode bboxes to deltas.
-    """
+    """Encode bboxes to deltas."""
     src_w = src_boxes[:, 2] - src_boxes[:, 0]
     src_h = src_boxes[:, 3] - src_boxes[:, 1]
     src_ctr_x = src_boxes[:, 0] + 0.5 * src_w
@@ -74,17 +74,17 @@ def delta2bbox(deltas, boxes, weights=[1.0, 1.0, 1.0, 1.0], max_shape=None):
     pred_boxes = paddle.stack(pred_boxes, axis=-1)
 
     if max_shape is not None:
-        pred_boxes[..., 0::2] = pred_boxes[..., 0::2].clip(
-            min=0, max=max_shape[1])
-        pred_boxes[..., 1::2] = pred_boxes[..., 1::2].clip(
-            min=0, max=max_shape[0])
+        pred_boxes[..., 0::2] = pred_boxes[..., 0::2].clip(min=0, max=max_shape[1])
+        pred_boxes[..., 1::2] = pred_boxes[..., 1::2].clip(min=0, max=max_shape[0])
     return pred_boxes
 
 
-def bbox2delta_v2(src_boxes,
-                  tgt_boxes,
-                  delta_mean=[0.0, 0.0, 0.0, 0.0],
-                  delta_std=[1.0, 1.0, 1.0, 1.0]):
+def bbox2delta_v2(
+    src_boxes,
+    tgt_boxes,
+    delta_mean=[0.0, 0.0, 0.0, 0.0],
+    delta_std=[1.0, 1.0, 1.0, 1.0],
+):
     """Encode bboxes to deltas.
     Modified from bbox2delta() which just use weight parameters to multiply deltas.
     """
@@ -104,17 +104,18 @@ def bbox2delta_v2(src_boxes,
     dh = paddle.log(tgt_h / src_h)
 
     deltas = paddle.stack((dx, dy, dw, dh), axis=1)
-    deltas = (
-        deltas - paddle.to_tensor(delta_mean)) / paddle.to_tensor(delta_std)
+    deltas = (deltas - paddle.to_tensor(delta_mean)) / paddle.to_tensor(delta_std)
     return deltas
 
 
-def delta2bbox_v2(deltas,
-                  boxes,
-                  delta_mean=[0.0, 0.0, 0.0, 0.0],
-                  delta_std=[1.0, 1.0, 1.0, 1.0],
-                  max_shape=None,
-                  ctr_clip=32.0):
+def delta2bbox_v2(
+    deltas,
+    boxes,
+    delta_mean=[0.0, 0.0, 0.0, 0.0],
+    delta_std=[1.0, 1.0, 1.0, 1.0],
+    max_shape=None,
+    ctr_clip=32.0,
+):
     """Decode deltas to bboxes.
     Modified from delta2bbox() which just use weight parameters to be divided by deltas.
     Used in YOLOFHead.
@@ -159,18 +160,16 @@ def delta2bbox_v2(deltas,
     pred_boxes = paddle.stack(pred_boxes, axis=-1)
 
     if max_shape is not None:
-        pred_boxes[..., 0::2] = pred_boxes[..., 0::2].clip(
-            min=0, max=max_shape[1])
-        pred_boxes[..., 1::2] = pred_boxes[..., 1::2].clip(
-            min=0, max=max_shape[0])
+        pred_boxes[..., 0::2] = pred_boxes[..., 0::2].clip(min=0, max=max_shape[1])
+        pred_boxes[..., 1::2] = pred_boxes[..., 1::2].clip(min=0, max=max_shape[0])
     return pred_boxes
 
 
 def expand_bbox(bboxes, scale):
-    w_half = (bboxes[:, 2] - bboxes[:, 0]) * .5
-    h_half = (bboxes[:, 3] - bboxes[:, 1]) * .5
-    x_c = (bboxes[:, 2] + bboxes[:, 0]) * .5
-    y_c = (bboxes[:, 3] + bboxes[:, 1]) * .5
+    w_half = (bboxes[:, 2] - bboxes[:, 0]) * 0.5
+    h_half = (bboxes[:, 3] - bboxes[:, 1]) * 0.5
+    x_c = (bboxes[:, 2] + bboxes[:, 0]) * 0.5
+    y_c = (bboxes[:, 3] + bboxes[:, 1]) * 0.5
 
     w_half *= scale
     h_half *= scale
@@ -221,29 +220,25 @@ def bbox_overlaps(boxes1, boxes2):
     M = boxes1.shape[0]
     N = boxes2.shape[0]
     if M * N == 0:
-        return paddle.zeros([M, N], dtype='float32')
+        return paddle.zeros([M, N], dtype="float32")
     area1 = bbox_area(boxes1)
     area2 = bbox_area(boxes2)
 
-    xy_max = paddle.minimum(
-        paddle.unsqueeze(boxes1, 1)[:, :, 2:], boxes2[:, 2:])
-    xy_min = paddle.maximum(
-        paddle.unsqueeze(boxes1, 1)[:, :, :2], boxes2[:, :2])
+    xy_max = paddle.minimum(paddle.unsqueeze(boxes1, 1)[:, :, 2:], boxes2[:, 2:])
+    xy_min = paddle.maximum(paddle.unsqueeze(boxes1, 1)[:, :, :2], boxes2[:, :2])
     width_height = xy_max - xy_min
     width_height = width_height.clip(min=0)
     inter = width_height.prod(axis=2)
 
-    overlaps = paddle.where(inter > 0, inter /
-                            (paddle.unsqueeze(area1, 1) + area2 - inter),
-                            paddle.zeros_like(inter))
+    overlaps = paddle.where(
+        inter > 0,
+        inter / (paddle.unsqueeze(area1, 1) + area2 - inter),
+        paddle.zeros_like(inter),
+    )
     return overlaps
 
 
-def batch_bbox_overlaps(bboxes1,
-                        bboxes2,
-                        mode='iou',
-                        is_aligned=False,
-                        eps=1e-6):
+def batch_bbox_overlaps(bboxes1, bboxes2, mode="iou", is_aligned=False, eps=1e-6):
     """Calculate overlap between two set of bboxes.
     If ``is_aligned `` is ``False``, then calculate the overlaps between each
     bbox of bboxes1 and bboxes2, otherwise the overlaps between each aligned
@@ -262,10 +257,10 @@ def batch_bbox_overlaps(bboxes1,
     Returns:
         Tensor: shape (m, n) if ``is_aligned `` is False else shape (m,)
     """
-    assert mode in ['iou', 'iof', 'giou'], 'Unsupported mode {}'.format(mode)
+    assert mode in ["iou", "iof", "giou"], "Unsupported mode {}".format(mode)
     # Either the boxes are empty or the length of boxes's last dimenstion is 4
-    assert (bboxes1.shape[-1] == 4 or bboxes1.shape[0] == 0)
-    assert (bboxes2.shape[-1] == 4 or bboxes2.shape[0] == 0)
+    assert bboxes1.shape[-1] == 4 or bboxes1.shape[0] == 0
+    assert bboxes2.shape[-1] == 4 or bboxes2.shape[0] == 0
 
     # Batch dim must be the same
     # Batch dim: (B1, B2, ... Bn)
@@ -279,7 +274,7 @@ def batch_bbox_overlaps(bboxes1,
 
     if rows * cols == 0:
         if is_aligned:
-            return paddle.full(batch_shape + (rows, ), 1)
+            return paddle.full(batch_shape + (rows,), 1)
         else:
             return paddle.full(batch_shape + (rows, cols), 1)
 
@@ -293,37 +288,40 @@ def batch_bbox_overlaps(bboxes1,
         wh = (rb - lt).clip(min=0)  # [B, rows, 2]
         overlap = wh[:, 0] * wh[:, 1]
 
-        if mode in ['iou', 'giou']:
+        if mode in ["iou", "giou"]:
             union = area1 + area2 - overlap
         else:
             union = area1
-        if mode == 'giou':
+        if mode == "giou":
             enclosed_lt = paddle.minimum(bboxes1[:, :2], bboxes2[:, :2])
             enclosed_rb = paddle.maximum(bboxes1[:, 2:], bboxes2[:, 2:])
     else:
-        lt = paddle.maximum(bboxes1[:, :2].reshape([rows, 1, 2]),
-                            bboxes2[:, :2])  # [B, rows, cols, 2]
-        rb = paddle.minimum(bboxes1[:, 2:].reshape([rows, 1, 2]),
-                            bboxes2[:, 2:])  # [B, rows, cols, 2]
+        lt = paddle.maximum(
+            bboxes1[:, :2].reshape([rows, 1, 2]), bboxes2[:, :2]
+        )  # [B, rows, cols, 2]
+        rb = paddle.minimum(
+            bboxes1[:, 2:].reshape([rows, 1, 2]), bboxes2[:, 2:]
+        )  # [B, rows, cols, 2]
 
         wh = (rb - lt).clip(min=0)  # [B, rows, cols, 2]
         overlap = wh[:, :, 0] * wh[:, :, 1]
 
-        if mode in ['iou', 'giou']:
-            union = area1.reshape([rows,1]) \
-                    + area2.reshape([1,cols]) - overlap
+        if mode in ["iou", "giou"]:
+            union = area1.reshape([rows, 1]) + area2.reshape([1, cols]) - overlap
         else:
             union = area1[:, None]
-        if mode == 'giou':
-            enclosed_lt = paddle.minimum(bboxes1[:, :2].reshape([rows, 1, 2]),
-                                         bboxes2[:, :2])
-            enclosed_rb = paddle.maximum(bboxes1[:, 2:].reshape([rows, 1, 2]),
-                                         bboxes2[:, 2:])
+        if mode == "giou":
+            enclosed_lt = paddle.minimum(
+                bboxes1[:, :2].reshape([rows, 1, 2]), bboxes2[:, :2]
+            )
+            enclosed_rb = paddle.maximum(
+                bboxes1[:, 2:].reshape([rows, 1, 2]), bboxes2[:, 2:]
+            )
 
     eps = paddle.to_tensor([eps])
     union = paddle.maximum(union, eps)
     ious = overlap / union
-    if mode in ['iou', 'iof']:
+    if mode in ["iou", "iof"]:
         return ious
     # calculate gious
     enclose_wh = (enclosed_rb - enclosed_lt).clip(min=0)
@@ -439,7 +437,7 @@ def bbox_iou(box1, box2, giou=False, diou=False, ciou=False, eps=1e-9):
             # convex diagonal squared
             c2 = cw**2 + ch**2 + eps
             # center distance
-            rho2 = ((px1 + px2 - gx1 - gx2)**2 + (py1 + py2 - gy1 - gy2)**2) / 4
+            rho2 = ((px1 + px2 - gx1 - gx2) ** 2 + (py1 + py2 - gy1 - gy2) ** 2) / 4
             if diou:
                 return iou - rho2 / c2
             else:
@@ -492,12 +490,11 @@ def bbox_iou_np_expand(box1, box2, x1y1x2y2=True, eps=1e-16):
         inter_rect_y2[:, i] = np.minimum(b1_y2, b2_y2[i])
     # Intersection area
     inter_area = np.maximum(inter_rect_x2 - inter_rect_x1, 0) * np.maximum(
-        inter_rect_y2 - inter_rect_y1, 0)
+        inter_rect_y2 - inter_rect_y1, 0
+    )
     # Union Area
-    b1_area = np.repeat(
-        ((b1_x2 - b1_x1) * (b1_y2 - b1_y1)).reshape(-1, 1), M, axis=-1)
-    b2_area = np.repeat(
-        ((b2_x2 - b2_x1) * (b2_y2 - b2_y1)).reshape(1, -1), N, axis=0)
+    b1_area = np.repeat(((b1_x2 - b1_x1) * (b1_y2 - b1_y1)).reshape(-1, 1), M, axis=-1)
+    b2_area = np.repeat(((b2_x2 - b2_x1) * (b2_y2 - b2_y1)).reshape(1, -1), N, axis=0)
 
     ious = inter_area / (b1_area + b2_area - inter_area + eps)
     return ious
@@ -527,14 +524,14 @@ def bbox2distance(points, bbox, max_dis=None, eps=0.1):
 
 def distance2bbox(points, distance, max_shape=None):
     """Decode distance prediction to bounding box.
-        Args:
-            points (Tensor): Shape (n, 2), [x, y].
-            distance (Tensor): Distance from the given point to 4
-                boundaries (left, top, right, bottom).
-            max_shape (tuple): Shape of the image.
-        Returns:
-            Tensor: Decoded bboxes.
-        """
+    Args:
+        points (Tensor): Shape (n, 2), [x, y].
+        distance (Tensor): Distance from the given point to 4
+            boundaries (left, top, right, bottom).
+        max_shape (tuple): Shape of the image.
+    Returns:
+        Tensor: Decoded bboxes.
+    """
     x1 = points[:, 0] - distance[:, 0]
     y1 = points[:, 1] - distance[:, 1]
     x2 = points[:, 0] + distance[:, 2]
@@ -579,8 +576,7 @@ def batch_distance2bbox(points, distance, max_shapes=None):
         for _ in range(delta_dim):
             max_shapes.unsqueeze_(1)
         out_bbox = paddle.where(out_bbox < max_shapes, out_bbox, max_shapes)
-        out_bbox = paddle.where(out_bbox > 0, out_bbox,
-                                paddle.zeros_like(out_bbox))
+        out_bbox = paddle.where(out_bbox > 0, out_bbox, paddle.zeros_like(out_bbox))
     return out_bbox
 
 

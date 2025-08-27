@@ -8,8 +8,10 @@ in the end of the file, as python3 can suppress prints with contextlib
 # MiXaiLL76 replacing pycocotools with faster-coco-eval for better performance and support.
 """
 
-from ...core import register
 from faster_coco_eval.utils.pytorch import FasterCocoEvaluator
+
+from ...core import register
+
 
 @register()
 class CocoEvaluator(FasterCocoEvaluator):

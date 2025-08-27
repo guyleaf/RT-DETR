@@ -1,29 +1,35 @@
-""""Copyright(c) 2023 lyuwenyu. All Rights Reserved.
-"""
+""" "Copyright(c) 2023 lyuwenyu. All Rights Reserved."""
 
-import torch 
+import torch
 import torchvision
+
 torchvision.disable_beta_transforms_warning()
+import random
+
 import torchvision.transforms.v2 as T
 import torchvision.transforms.v2.functional as F
+from PIL import Image
 
-import random
-from PIL import Image 
-
-from .._misc import convert_to_tv_tensor
 from ...core import register
+from .._misc import convert_to_tv_tensor
 
 
 @register()
 class Mosaic(T.Transform):
-    def __init__(self, size, max_size=None, ) -> None:
+    def __init__(
+        self,
+        size,
+        max_size=None,
+    ) -> None:
         super().__init__()
         self.resize = T.Resize(size=size, max_size=max_size)
         self.crop = T.RandomCrop(size=max_size if max_size else size)
-        
+
         # TODO add arg `output_size` for affine`
         # self.random_perspective = T.RandomPerspective(distortion_scale=0.5, p=1., )
-        self.random_affine = T.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.5, 1.5), fill=114)
+        self.random_affine = T.RandomAffine(
+            degrees=0, translate=(0.1, 0.1), scale=(0.5, 1.5), fill=114
+        )
 
     def forward(self, *inputs):
         inputs = inputs if len(inputs) > 1 else inputs[0]
@@ -47,23 +53,25 @@ class Mosaic(T.Transform):
         offset = torch.tensor([[0, 0], [w, 0], [0, h], [w, h]]).repeat(1, 2)
         target = {}
         for k in targets[0]:
-            if k == 'boxes':
+            if k == "boxes":
                 v = [t[k] + offset[i] for i, t in enumerate(targets)]
-            else: 
+            else:
                 v = [t[k] for t in targets]
-            
+
             if isinstance(v[0], torch.Tensor):
                 v = torch.cat(v, dim=0)
 
             target[k] = v
 
-        if 'boxes' in target:
+        if "boxes" in target:
             # target['boxes'] = target['boxes'].clamp(0, 640 * 2 - 1)
             w, h = image.size
-            target['boxes'] = convert_to_tv_tensor(target['boxes'], 'boxes', box_format='xyxy', spatial_size=[h, w])
-        
-        if 'masks' in target:
-            target['masks'] = convert_to_tv_tensor(target['masks'], 'masks')
+            target["boxes"] = convert_to_tv_tensor(
+                target["boxes"], "boxes", box_format="xyxy", spatial_size=[h, w]
+            )
+
+        if "masks" in target:
+            target["masks"] = convert_to_tv_tensor(target["masks"], "masks")
 
         image, target = self.random_affine(image, target)
         # image, target = self.resize(image, target)

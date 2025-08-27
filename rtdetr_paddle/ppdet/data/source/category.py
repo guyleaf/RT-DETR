@@ -1,28 +1,27 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved. 
-#   
-# Licensed under the Apache License, Version 2.0 (the "License");   
-# you may not use this file except in compliance with the License.  
-# You may obtain a copy of the License at   
-#   
-#     http://www.apache.org/licenses/LICENSE-2.0    
-#   
-# Unless required by applicable law or agreed to in writing, software   
-# distributed under the License is distributed on an "AS IS" BASIS, 
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  
-# See the License for the specific language governing permissions and   
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import os
 
 from ppdet.data.source.voc import pascalvoc_label
 from ppdet.utils.logger import setup_logger
+
 logger = setup_logger(__name__)
 
-__all__ = ['get_categories']
+__all__ = ["get_categories"]
 
 
 def get_categories(metric_type, anno_file=None, arch=None):
@@ -35,62 +34,73 @@ def get_categories(metric_type, anno_file=None, arch=None):
             and 'widerface'.
         anno_file (str): annotation file path
     """
-    if arch == 'keypoint_arch':
-        return (None, {'id': 'keypoint'})
+    if arch == "keypoint_arch":
+        return (None, {"id": "keypoint"})
 
     if anno_file == None or (not os.path.isfile(anno_file)):
         logger.warning(
             "anno_file '{}' is None or not set or not exist, "
             "please recheck TrainDataset/EvalDataset/TestDataset.anno_path, "
-            "otherwise the default categories will be used by metric_type.".
-            format(anno_file))
+            "otherwise the default categories will be used by metric_type.".format(
+                anno_file
+            )
+        )
 
-    if metric_type.lower() == 'coco' or metric_type.lower(
-    ) == 'rbox' or metric_type.lower() == 'snipercoco':
+    if (
+        metric_type.lower() == "coco"
+        or metric_type.lower() == "rbox"
+        or metric_type.lower() == "snipercoco"
+    ):
         if anno_file and os.path.isfile(anno_file):
-            if anno_file.endswith('json'):
+            if anno_file.endswith("json"):
                 # lazy import pycocotools here
                 from pycocotools.coco import COCO
+
                 coco = COCO(anno_file)
                 cats = coco.loadCats(coco.getCatIds())
 
-                clsid2catid = {i: cat['id'] for i, cat in enumerate(cats)}
-                catid2name = {cat['id']: cat['name'] for cat in cats}
+                clsid2catid = {i: cat["id"] for i, cat in enumerate(cats)}
+                catid2name = {cat["id"]: cat["name"] for cat in cats}
 
-            elif anno_file.endswith('txt'):
+            elif anno_file.endswith("txt"):
                 cats = []
                 with open(anno_file) as f:
                     for line in f.readlines():
                         cats.append(line.strip())
-                if cats[0] == 'background': cats = cats[1:]
+                if cats[0] == "background":
+                    cats = cats[1:]
 
                 clsid2catid = {i: i for i in range(len(cats))}
                 catid2name = {i: name for i, name in enumerate(cats)}
 
             else:
-                raise ValueError("anno_file {} should be json or txt.".format(
-                    anno_file))
+                raise ValueError(
+                    "anno_file {} should be json or txt.".format(anno_file)
+                )
             return clsid2catid, catid2name
 
         # anno file not exist, load default categories of COCO17
         else:
-            if metric_type.lower() == 'rbox':
+            if metric_type.lower() == "rbox":
                 logger.warning(
                     "metric_type: {}, load default categories of DOTA.".format(
-                        metric_type))
+                        metric_type
+                    )
+                )
                 return _dota_category()
-            logger.warning("metric_type: {}, load default categories of COCO.".
-                           format(metric_type))
+            logger.warning(
+                "metric_type: {}, load default categories of COCO.".format(metric_type)
+            )
             return _coco17_category()
 
-    elif metric_type.lower() == 'voc':
+    elif metric_type.lower() == "voc":
         if anno_file and os.path.isfile(anno_file):
             cats = []
             with open(anno_file) as f:
                 for line in f.readlines():
                     cats.append(line.strip())
 
-            if cats[0] == 'background':
+            if cats[0] == "background":
                 cats = cats[1:]
 
             clsid2catid = {i: i for i in range(len(cats))}
@@ -101,29 +111,32 @@ def get_categories(metric_type, anno_file=None, arch=None):
         # anno file not exist, load default categories of
         # VOC all 20 categories
         else:
-            logger.warning("metric_type: {}, load default categories of VOC.".
-                           format(metric_type))
+            logger.warning(
+                "metric_type: {}, load default categories of VOC.".format(metric_type)
+            )
             return _vocall_category()
 
-    elif metric_type.lower() == 'oid':
+    elif metric_type.lower() == "oid":
         if anno_file and os.path.isfile(anno_file):
             logger.warning("only default categories support for OID19")
         return _oid19_category()
 
-    elif metric_type.lower() == 'keypointtopdowncocoeval' or metric_type.lower(
-    ) == 'keypointtopdownmpiieval':
-        return (None, {'id': 'keypoint'})
+    elif (
+        metric_type.lower() == "keypointtopdowncocoeval"
+        or metric_type.lower() == "keypointtopdownmpiieval"
+    ):
+        return (None, {"id": "keypoint"})
 
-    elif metric_type.lower() == 'pose3deval':
-        return (None, {'id': 'pose3d'})
+    elif metric_type.lower() == "pose3deval":
+        return (None, {"id": "pose3d"})
 
-    elif metric_type.lower() in ['mot', 'motdet', 'reid']:
+    elif metric_type.lower() in ["mot", "motdet", "reid"]:
         if anno_file and os.path.isfile(anno_file):
             cats = []
             with open(anno_file) as f:
                 for line in f.readlines():
                     cats.append(line.strip())
-            if cats[0] == 'background':
+            if cats[0] == "background":
                 cats = cats[1:]
             clsid2catid = {i: i for i in range(len(cats))}
             catid2name = {i: name for i, name in enumerate(cats)}
@@ -131,20 +144,22 @@ def get_categories(metric_type, anno_file=None, arch=None):
         # anno file not exist, load default category 'pedestrian'.
         else:
             logger.warning(
-                "metric_type: {}, load default categories of pedestrian MOT.".
-                format(metric_type))
-            return _mot_category(category='pedestrian')
+                "metric_type: {}, load default categories of pedestrian MOT.".format(
+                    metric_type
+                )
+            )
+            return _mot_category(category="pedestrian")
 
-    elif metric_type.lower() in ['kitti', 'bdd100kmot']:
-        return _mot_category(category='vehicle')
+    elif metric_type.lower() in ["kitti", "bdd100kmot"]:
+        return _mot_category(category="vehicle")
 
-    elif metric_type.lower() in ['mcmot']:
+    elif metric_type.lower() in ["mcmot"]:
         if anno_file and os.path.isfile(anno_file):
             cats = []
             with open(anno_file) as f:
                 for line in f.readlines():
                     cats.append(line.strip())
-            if cats[0] == 'background':
+            if cats[0] == "background":
                 cats = cats[1:]
             clsid2catid = {i: i for i in range(len(cats))}
             catid2name = {i: name for i, name in enumerate(cats)}
@@ -153,14 +168,16 @@ def get_categories(metric_type, anno_file=None, arch=None):
         else:
             logger.warning(
                 "metric_type: {}, load default categories of VisDrone.".format(
-                    metric_type))
+                    metric_type
+                )
+            )
             return _visdrone_category()
 
     else:
         raise ValueError("unknown metric type {}".format(metric_type))
 
 
-def _mot_category(category='pedestrian'):
+def _mot_category(category="pedestrian"):
     """
     Get class id to category id map and category id
     to category name map of mot dataset
@@ -261,91 +278,91 @@ def _coco17_category():
         77: 87,
         78: 88,
         79: 89,
-        80: 90
+        80: 90,
     }
 
     catid2name = {
-        0: 'background',
-        1: 'person',
-        2: 'bicycle',
-        3: 'car',
-        4: 'motorcycle',
-        5: 'airplane',
-        6: 'bus',
-        7: 'train',
-        8: 'truck',
-        9: 'boat',
-        10: 'traffic light',
-        11: 'fire hydrant',
-        13: 'stop sign',
-        14: 'parking meter',
-        15: 'bench',
-        16: 'bird',
-        17: 'cat',
-        18: 'dog',
-        19: 'horse',
-        20: 'sheep',
-        21: 'cow',
-        22: 'elephant',
-        23: 'bear',
-        24: 'zebra',
-        25: 'giraffe',
-        27: 'backpack',
-        28: 'umbrella',
-        31: 'handbag',
-        32: 'tie',
-        33: 'suitcase',
-        34: 'frisbee',
-        35: 'skis',
-        36: 'snowboard',
-        37: 'sports ball',
-        38: 'kite',
-        39: 'baseball bat',
-        40: 'baseball glove',
-        41: 'skateboard',
-        42: 'surfboard',
-        43: 'tennis racket',
-        44: 'bottle',
-        46: 'wine glass',
-        47: 'cup',
-        48: 'fork',
-        49: 'knife',
-        50: 'spoon',
-        51: 'bowl',
-        52: 'banana',
-        53: 'apple',
-        54: 'sandwich',
-        55: 'orange',
-        56: 'broccoli',
-        57: 'carrot',
-        58: 'hot dog',
-        59: 'pizza',
-        60: 'donut',
-        61: 'cake',
-        62: 'chair',
-        63: 'couch',
-        64: 'potted plant',
-        65: 'bed',
-        67: 'dining table',
-        70: 'toilet',
-        72: 'tv',
-        73: 'laptop',
-        74: 'mouse',
-        75: 'remote',
-        76: 'keyboard',
-        77: 'cell phone',
-        78: 'microwave',
-        79: 'oven',
-        80: 'toaster',
-        81: 'sink',
-        82: 'refrigerator',
-        84: 'book',
-        85: 'clock',
-        86: 'vase',
-        87: 'scissors',
-        88: 'teddy bear',
-        89: 'hair drier',
-        90: 'toothbrush'
+        0: "background",
+        1: "person",
+        2: "bicycle",
+        3: "car",
+        4: "motorcycle",
+        5: "airplane",
+        6: "bus",
+        7: "train",
+        8: "truck",
+        9: "boat",
+        10: "traffic light",
+        11: "fire hydrant",
+        13: "stop sign",
+        14: "parking meter",
+        15: "bench",
+        16: "bird",
+        17: "cat",
+        18: "dog",
+        19: "horse",
+        20: "sheep",
+        21: "cow",
+        22: "elephant",
+        23: "bear",
+        24: "zebra",
+        25: "giraffe",
+        27: "backpack",
+        28: "umbrella",
+        31: "handbag",
+        32: "tie",
+        33: "suitcase",
+        34: "frisbee",
+        35: "skis",
+        36: "snowboard",
+        37: "sports ball",
+        38: "kite",
+        39: "baseball bat",
+        40: "baseball glove",
+        41: "skateboard",
+        42: "surfboard",
+        43: "tennis racket",
+        44: "bottle",
+        46: "wine glass",
+        47: "cup",
+        48: "fork",
+        49: "knife",
+        50: "spoon",
+        51: "bowl",
+        52: "banana",
+        53: "apple",
+        54: "sandwich",
+        55: "orange",
+        56: "broccoli",
+        57: "carrot",
+        58: "hot dog",
+        59: "pizza",
+        60: "donut",
+        61: "cake",
+        62: "chair",
+        63: "couch",
+        64: "potted plant",
+        65: "bed",
+        67: "dining table",
+        70: "toilet",
+        72: "tv",
+        73: "laptop",
+        74: "mouse",
+        75: "remote",
+        76: "keyboard",
+        77: "cell phone",
+        78: "microwave",
+        79: "oven",
+        80: "toaster",
+        81: "sink",
+        82: "refrigerator",
+        84: "book",
+        85: "clock",
+        86: "vase",
+        87: "scissors",
+        88: "teddy bear",
+        89: "hair drier",
+        90: "toothbrush",
     }
 
     clsid2catid = {k - 1: v for k, v in clsid2catid.items()}
@@ -360,22 +377,22 @@ def _dota_category():
     to category name map of dota dataset
     """
     catid2name = {
-        0: 'background',
-        1: 'plane',
-        2: 'baseball-diamond',
-        3: 'bridge',
-        4: 'ground-track-field',
-        5: 'small-vehicle',
-        6: 'large-vehicle',
-        7: 'ship',
-        8: 'tennis-court',
-        9: 'basketball-court',
-        10: 'storage-tank',
-        11: 'soccer-ball-field',
-        12: 'roundabout',
-        13: 'harbor',
-        14: 'swimming-pool',
-        15: 'helicopter'
+        0: "background",
+        1: "plane",
+        2: "baseball-diamond",
+        3: "bridge",
+        4: "ground-track-field",
+        5: "small-vehicle",
+        6: "large-vehicle",
+        7: "ship",
+        8: "tennis-court",
+        9: "basketball-court",
+        10: "storage-tank",
+        11: "soccer-ball-field",
+        12: "roundabout",
+        13: "harbor",
+        14: "swimming-pool",
+        15: "helicopter",
     }
     catid2name.pop(0)
     clsid2catid = {i: i + 1 for i in range(len(catid2name))}
@@ -912,15 +929,15 @@ def _visdrone_category():
     clsid2catid = {i: i for i in range(10)}
 
     catid2name = {
-        0: 'pedestrian',
-        1: 'people',
-        2: 'bicycle',
-        3: 'car',
-        4: 'van',
-        5: 'truck',
-        6: 'tricycle',
-        7: 'awning-tricycle',
-        8: 'bus',
-        9: 'motor'
+        0: "pedestrian",
+        1: "people",
+        2: "bicycle",
+        3: "car",
+        4: "van",
+        5: "truck",
+        6: "tricycle",
+        7: "awning-tricycle",
+        8: "bus",
+        9: "motor",
     }
     return clsid2catid, catid2name

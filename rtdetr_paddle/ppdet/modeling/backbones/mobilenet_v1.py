@@ -12,36 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
+
+from numbers import Integral
 
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import ParamAttr
-from paddle.regularizer import L2Decay
 from paddle.nn.initializer import KaimingNormal
+from paddle.regularizer import L2Decay
+
 from ppdet.core.workspace import register, serializable
-from numbers import Integral
+
 from ..shape_spec import ShapeSpec
 
-__all__ = ['MobileNet']
+__all__ = ["MobileNet"]
 
 
 class ConvBNLayer(nn.Layer):
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size,
-                 stride,
-                 padding,
-                 num_groups=1,
-                 act='relu',
-                 conv_lr=1.,
-                 conv_decay=0.,
-                 norm_decay=0.,
-                 norm_type='bn',
-                 name=None):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride,
+        padding,
+        num_groups=1,
+        act="relu",
+        conv_lr=1.0,
+        conv_decay=0.0,
+        norm_decay=0.0,
+        norm_type="bn",
+        name=None,
+    ):
         super(ConvBNLayer, self).__init__()
         self.act = act
         self._conv = nn.Conv2D(
@@ -54,14 +57,17 @@ class ConvBNLayer(nn.Layer):
             weight_attr=ParamAttr(
                 learning_rate=conv_lr,
                 initializer=KaimingNormal(),
-                regularizer=L2Decay(conv_decay)),
-            bias_attr=False)
+                regularizer=L2Decay(conv_decay),
+            ),
+            bias_attr=False,
+        )
 
         param_attr = ParamAttr(regularizer=L2Decay(norm_decay))
         bias_attr = ParamAttr(regularizer=L2Decay(norm_decay))
-        if norm_type in ['sync_bn', 'bn']:
+        if norm_type in ["sync_bn", "bn"]:
             self._batch_norm = nn.BatchNorm2D(
-                out_channels, weight_attr=param_attr, bias_attr=bias_attr)
+                out_channels, weight_attr=param_attr, bias_attr=bias_attr
+            )
 
     def forward(self, x):
         x = self._conv(x)
@@ -74,18 +80,20 @@ class ConvBNLayer(nn.Layer):
 
 
 class DepthwiseSeparable(nn.Layer):
-    def __init__(self,
-                 in_channels,
-                 out_channels1,
-                 out_channels2,
-                 num_groups,
-                 stride,
-                 scale,
-                 conv_lr=1.,
-                 conv_decay=0.,
-                 norm_decay=0.,
-                 norm_type='bn',
-                 name=None):
+    def __init__(
+        self,
+        in_channels,
+        out_channels1,
+        out_channels2,
+        num_groups,
+        stride,
+        scale,
+        conv_lr=1.0,
+        conv_decay=0.0,
+        norm_decay=0.0,
+        norm_type="bn",
+        name=None,
+    ):
         super(DepthwiseSeparable, self).__init__()
 
         self._depthwise_conv = ConvBNLayer(
@@ -99,7 +107,8 @@ class DepthwiseSeparable(nn.Layer):
             conv_decay=conv_decay,
             norm_decay=norm_decay,
             norm_type=norm_type,
-            name=name + "_dw")
+            name=name + "_dw",
+        )
 
         self._pointwise_conv = ConvBNLayer(
             int(out_channels1 * scale),
@@ -111,7 +120,8 @@ class DepthwiseSeparable(nn.Layer):
             conv_decay=conv_decay,
             norm_decay=norm_decay,
             norm_type=norm_type,
-            name=name + "_sep")
+            name=name + "_sep",
+        )
 
     def forward(self, x):
         x = self._depthwise_conv(x)
@@ -120,17 +130,19 @@ class DepthwiseSeparable(nn.Layer):
 
 
 class ExtraBlock(nn.Layer):
-    def __init__(self,
-                 in_channels,
-                 out_channels1,
-                 out_channels2,
-                 num_groups=1,
-                 stride=2,
-                 conv_lr=1.,
-                 conv_decay=0.,
-                 norm_decay=0.,
-                 norm_type='bn',
-                 name=None):
+    def __init__(
+        self,
+        in_channels,
+        out_channels1,
+        out_channels2,
+        num_groups=1,
+        stride=2,
+        conv_lr=1.0,
+        conv_decay=0.0,
+        norm_decay=0.0,
+        norm_type="bn",
+        name=None,
+    ):
         super(ExtraBlock, self).__init__()
 
         self.pointwise_conv = ConvBNLayer(
@@ -140,12 +152,13 @@ class ExtraBlock(nn.Layer):
             stride=1,
             padding=0,
             num_groups=int(num_groups),
-            act='relu6',
+            act="relu6",
             conv_lr=conv_lr,
             conv_decay=conv_decay,
             norm_decay=norm_decay,
             norm_type=norm_type,
-            name=name + "_extra1")
+            name=name + "_extra1",
+        )
 
         self.normal_conv = ConvBNLayer(
             int(out_channels1),
@@ -154,12 +167,13 @@ class ExtraBlock(nn.Layer):
             stride=stride,
             padding=1,
             num_groups=int(num_groups),
-            act='relu6',
+            act="relu6",
             conv_lr=conv_lr,
             conv_decay=conv_decay,
             norm_decay=norm_decay,
             norm_type=norm_type,
-            name=name + "_extra2")
+            name=name + "_extra2",
+        )
 
     def forward(self, x):
         x = self.pointwise_conv(x)
@@ -170,18 +184,19 @@ class ExtraBlock(nn.Layer):
 @register
 @serializable
 class MobileNet(nn.Layer):
-    __shared__ = ['norm_type']
+    __shared__ = ["norm_type"]
 
-    def __init__(self,
-                 norm_type='bn',
-                 norm_decay=0.,
-                 conv_decay=0.,
-                 scale=1,
-                 conv_learning_rate=1.0,
-                 feature_maps=[4, 6, 13],
-                 with_extra_blocks=False,
-                 extra_block_filters=[[256, 512], [128, 256], [128, 256],
-                                      [64, 128]]):
+    def __init__(
+        self,
+        norm_type="bn",
+        norm_decay=0.0,
+        conv_decay=0.0,
+        scale=1,
+        conv_learning_rate=1.0,
+        feature_maps=[4, 6, 13],
+        with_extra_blocks=False,
+        extra_block_filters=[[256, 512], [128, 256], [128, 256], [64, 128]],
+    ):
         super(MobileNet, self).__init__()
         if isinstance(feature_maps, Integral):
             feature_maps = [feature_maps]
@@ -201,7 +216,8 @@ class MobileNet(nn.Layer):
             conv_decay=conv_decay,
             norm_decay=norm_decay,
             norm_type=norm_type,
-            name="conv1")
+            name="conv1",
+        )
 
         self.dwsl = []
         dws21 = self.add_sublayer(
@@ -217,7 +233,9 @@ class MobileNet(nn.Layer):
                 conv_decay=conv_decay,
                 norm_decay=norm_decay,
                 norm_type=norm_type,
-                name="conv2_1"))
+                name="conv2_1",
+            ),
+        )
         self.dwsl.append(dws21)
         self._update_out_channels(int(64 * scale), len(self.dwsl), feature_maps)
         dws22 = self.add_sublayer(
@@ -233,7 +251,9 @@ class MobileNet(nn.Layer):
                 conv_decay=conv_decay,
                 norm_decay=norm_decay,
                 norm_type=norm_type,
-                name="conv2_2"))
+                name="conv2_2",
+            ),
+        )
         self.dwsl.append(dws22)
         self._update_out_channels(int(128 * scale), len(self.dwsl), feature_maps)
         # 1/4
@@ -250,7 +270,9 @@ class MobileNet(nn.Layer):
                 conv_decay=conv_decay,
                 norm_decay=norm_decay,
                 norm_type=norm_type,
-                name="conv3_1"))
+                name="conv3_1",
+            ),
+        )
         self.dwsl.append(dws31)
         self._update_out_channels(int(128 * scale), len(self.dwsl), feature_maps)
         dws32 = self.add_sublayer(
@@ -266,7 +288,9 @@ class MobileNet(nn.Layer):
                 conv_decay=conv_decay,
                 norm_decay=norm_decay,
                 norm_type=norm_type,
-                name="conv3_2"))
+                name="conv3_2",
+            ),
+        )
         self.dwsl.append(dws32)
         self._update_out_channels(int(256 * scale), len(self.dwsl), feature_maps)
         # 1/8
@@ -283,7 +307,9 @@ class MobileNet(nn.Layer):
                 conv_decay=conv_decay,
                 norm_decay=norm_decay,
                 norm_type=norm_type,
-                name="conv4_1"))
+                name="conv4_1",
+            ),
+        )
         self.dwsl.append(dws41)
         self._update_out_channels(int(256 * scale), len(self.dwsl), feature_maps)
         dws42 = self.add_sublayer(
@@ -299,7 +325,9 @@ class MobileNet(nn.Layer):
                 conv_decay=conv_decay,
                 norm_decay=norm_decay,
                 norm_type=norm_type,
-                name="conv4_2"))
+                name="conv4_2",
+            ),
+        )
         self.dwsl.append(dws42)
         self._update_out_channels(int(512 * scale), len(self.dwsl), feature_maps)
         # 1/16
@@ -317,7 +345,9 @@ class MobileNet(nn.Layer):
                     conv_decay=conv_decay,
                     norm_decay=norm_decay,
                     norm_type=norm_type,
-                    name="conv5_" + str(i + 1)))
+                    name="conv5_" + str(i + 1),
+                ),
+            )
             self.dwsl.append(tmp)
             self._update_out_channels(int(512 * scale), len(self.dwsl), feature_maps)
         dws56 = self.add_sublayer(
@@ -333,7 +363,9 @@ class MobileNet(nn.Layer):
                 conv_decay=conv_decay,
                 norm_decay=norm_decay,
                 norm_type=norm_type,
-                name="conv5_6"))
+                name="conv5_6",
+            ),
+        )
         self.dwsl.append(dws56)
         self._update_out_channels(int(1024 * scale), len(self.dwsl), feature_maps)
         # 1/32
@@ -350,7 +382,9 @@ class MobileNet(nn.Layer):
                 conv_decay=conv_decay,
                 norm_decay=norm_decay,
                 norm_type=norm_type,
-                name="conv6"))
+                name="conv6",
+            ),
+        )
         self.dwsl.append(dws6)
         self._update_out_channels(int(1024 * scale), len(self.dwsl), feature_maps)
 
@@ -368,11 +402,15 @@ class MobileNet(nn.Layer):
                         conv_decay=conv_decay,
                         norm_decay=norm_decay,
                         norm_type=norm_type,
-                        name="conv7_" + str(i + 1)))
+                        name="conv7_" + str(i + 1),
+                    ),
+                )
                 self.extra_blocks.append(conv_extra)
                 self._update_out_channels(
                     block_filter[1],
-                    len(self.dwsl) + len(self.extra_blocks), feature_maps)
+                    len(self.dwsl) + len(self.extra_blocks),
+                    feature_maps,
+                )
 
     def _update_out_channels(self, channel, feature_idx, feature_maps):
         if feature_idx in feature_maps:
@@ -380,7 +418,7 @@ class MobileNet(nn.Layer):
 
     def forward(self, inputs):
         outs = []
-        y = self.conv1(inputs['image'])
+        y = self.conv1(inputs["image"])
         for i, block in enumerate(self.dwsl):
             y = block(y)
             if i + 1 in self.feature_maps:

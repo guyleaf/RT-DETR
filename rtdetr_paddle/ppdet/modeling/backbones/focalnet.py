@@ -14,21 +14,30 @@
 """
 This code is based on https://github.com/microsoft/FocalNet/blob/main/classification/focalnet.py
 """
+
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from ppdet.modeling.shape_spec import ShapeSpec
-from ppdet.core.workspace import register, serializable
-from .transformer_utils import DropPath, Identity
-from .transformer_utils import add_parameter, to_2tuple
-from .transformer_utils import ones_, zeros_, trunc_normal_
-from .swin_transformer import Mlp
 
-__all__ = ['FocalNet']
+from ppdet.core.workspace import register, serializable
+from ppdet.modeling.shape_spec import ShapeSpec
+
+from .swin_transformer import Mlp
+from .transformer_utils import (
+    DropPath,
+    Identity,
+    add_parameter,
+    ones_,
+    to_2tuple,
+    trunc_normal_,
+    zeros_,
+)
+
+__all__ = ["FocalNet"]
 
 MODEL_cfg = {
-    'focalnet_T_224_1k_srf': dict(
+    "focalnet_T_224_1k_srf": dict(
         embed_dim=96,
         depths=[2, 2, 6, 2],
         focal_levels=[2, 2, 2, 2],
@@ -39,9 +48,9 @@ MODEL_cfg = {
         use_postln_in_modulation=False,
         use_layerscale=False,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_tiny_srf_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_tiny_srf_pretrained.pdparams",
     ),
-    'focalnet_S_224_1k_srf': dict(
+    "focalnet_S_224_1k_srf": dict(
         embed_dim=96,
         depths=[2, 2, 18, 2],
         focal_levels=[2, 2, 2, 2],
@@ -52,9 +61,9 @@ MODEL_cfg = {
         use_postln_in_modulation=False,
         use_layerscale=False,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_small_srf_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_small_srf_pretrained.pdparams",
     ),
-    'focalnet_B_224_1k_srf': dict(
+    "focalnet_B_224_1k_srf": dict(
         embed_dim=128,
         depths=[2, 2, 18, 2],
         focal_levels=[2, 2, 2, 2],
@@ -65,9 +74,9 @@ MODEL_cfg = {
         use_postln_in_modulation=False,
         use_layerscale=False,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_base_srf_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_base_srf_pretrained.pdparams",
     ),
-    'focalnet_T_224_1k_lrf': dict(
+    "focalnet_T_224_1k_lrf": dict(
         embed_dim=96,
         depths=[2, 2, 6, 2],
         focal_levels=[3, 3, 3, 3],
@@ -78,9 +87,9 @@ MODEL_cfg = {
         use_postln_in_modulation=False,
         use_layerscale=False,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_tiny_lrf_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_tiny_lrf_pretrained.pdparams",
     ),
-    'focalnet_S_224_1k_lrf': dict(
+    "focalnet_S_224_1k_lrf": dict(
         embed_dim=96,
         depths=[2, 2, 18, 2],
         focal_levels=[3, 3, 3, 3],
@@ -91,9 +100,9 @@ MODEL_cfg = {
         use_postln_in_modulation=False,
         use_layerscale=False,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_small_lrf_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_small_lrf_pretrained.pdparams",
     ),
-    'focalnet_B_224_1k_lrf': dict(
+    "focalnet_B_224_1k_lrf": dict(
         embed_dim=128,
         depths=[2, 2, 18, 2],
         focal_levels=[3, 3, 3, 3],
@@ -104,9 +113,9 @@ MODEL_cfg = {
         use_postln_in_modulation=False,
         use_layerscale=False,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_base_lrf_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_base_lrf_pretrained.pdparams",
     ),
-    'focalnet_L_384_22k_fl3': dict(
+    "focalnet_L_384_22k_fl3": dict(
         embed_dim=192,
         depths=[2, 2, 18, 2],
         focal_levels=[3, 3, 3, 3],
@@ -117,9 +126,9 @@ MODEL_cfg = {
         use_postln_in_modulation=False,
         use_layerscale=True,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_large_lrf_384_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_large_lrf_384_pretrained.pdparams",
     ),
-    'focalnet_L_384_22k_fl4': dict(
+    "focalnet_L_384_22k_fl4": dict(
         embed_dim=192,
         depths=[2, 2, 18, 2],
         focal_levels=[4, 4, 4, 4],
@@ -130,9 +139,9 @@ MODEL_cfg = {
         use_postln_in_modulation=False,
         use_layerscale=True,
         normalize_modulator=True,  #
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_large_lrf_384_fl4_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_large_lrf_384_fl4_pretrained.pdparams",
     ),
-    'focalnet_XL_384_22k_fl3': dict(
+    "focalnet_XL_384_22k_fl3": dict(
         embed_dim=256,
         depths=[2, 2, 18, 2],
         focal_levels=[3, 3, 3, 3],
@@ -143,9 +152,9 @@ MODEL_cfg = {
         use_postln_in_modulation=False,
         use_layerscale=True,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_xlarge_lrf_384_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_xlarge_lrf_384_pretrained.pdparams",
     ),
-    'focalnet_XL_384_22k_fl4': dict(
+    "focalnet_XL_384_22k_fl4": dict(
         embed_dim=256,
         depths=[2, 2, 18, 2],
         focal_levels=[4, 4, 4, 4],
@@ -156,9 +165,9 @@ MODEL_cfg = {
         use_postln_in_modulation=False,
         use_layerscale=True,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_xlarge_lrf_384_fl4_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_xlarge_lrf_384_fl4_pretrained.pdparams",
     ),
-    'focalnet_H_224_22k_fl3': dict(
+    "focalnet_H_224_22k_fl3": dict(
         embed_dim=352,
         depths=[2, 2, 18, 2],
         focal_levels=[3, 3, 3, 3],
@@ -169,9 +178,9 @@ MODEL_cfg = {
         use_postln_in_modulation=True,  #
         use_layerscale=True,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_huge_lrf_224_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_huge_lrf_224_pretrained.pdparams",
     ),
-    'focalnet_H_224_22k_fl4': dict(
+    "focalnet_H_224_22k_fl4": dict(
         embed_dim=352,
         depths=[2, 2, 18, 2],
         focal_levels=[4, 4, 4, 4],
@@ -182,7 +191,7 @@ MODEL_cfg = {
         use_postln_in_modulation=True,  #
         use_layerscale=True,
         normalize_modulator=False,
-        pretrained='https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_huge_lrf_224_fl4_pretrained.pdparams',
+        pretrained="https://bj.bcebos.com/v1/paddledet/models/pretrained/focalnet_huge_lrf_224_fl4_pretrained.pdparams",
     ),
 }
 
@@ -199,14 +208,16 @@ class FocalModulation(nn.Layer):
         normalize_modulator (bool): Whether use normalize in modulator
     """
 
-    def __init__(self,
-                 dim,
-                 proj_drop=0.,
-                 focal_level=2,
-                 focal_window=7,
-                 focal_factor=2,
-                 use_postln_in_modulation=False,
-                 normalize_modulator=False):
+    def __init__(
+        self,
+        dim,
+        proj_drop=0.0,
+        focal_level=2,
+        focal_window=7,
+        focal_factor=2,
+        use_postln_in_modulation=False,
+        normalize_modulator=False,
+    ):
         super().__init__()
         self.dim = dim
 
@@ -217,16 +228,10 @@ class FocalModulation(nn.Layer):
         self.use_postln_in_modulation = use_postln_in_modulation
         self.normalize_modulator = normalize_modulator
 
-        self.f = nn.Linear(
-            dim, 2 * dim + (self.focal_level + 1), bias_attr=True)
+        self.f = nn.Linear(dim, 2 * dim + (self.focal_level + 1), bias_attr=True)
         self.h = nn.Conv2D(
-            dim,
-            dim,
-            kernel_size=1,
-            stride=1,
-            padding=0,
-            groups=1,
-            bias_attr=True)
+            dim, dim, kernel_size=1, stride=1, padding=0, groups=1, bias_attr=True
+        )
 
         self.act = nn.GELU()
         self.proj = nn.Linear(dim, dim)
@@ -247,11 +252,14 @@ class FocalModulation(nn.Layer):
                         stride=1,
                         groups=dim,
                         padding=kernel_size // 2,
-                        bias_attr=False),
-                    nn.GELU()))
+                        bias_attr=False,
+                    ),
+                    nn.GELU(),
+                )
+            )
 
     def forward(self, x):
-        """ Forward function.
+        """Forward function.
         Args:
             x: input features with shape of (B, H, W, C)
         """
@@ -263,9 +271,9 @@ class FocalModulation(nn.Layer):
         ctx_all = 0
         for l in range(self.focal_level):
             ctx = self.focal_layers[l](ctx)
-            ctx_all = ctx_all + ctx * gates[:, l:l + 1]
+            ctx_all = ctx_all + ctx * gates[:, l : l + 1]
         ctx_global = self.act(ctx.mean(2, keepdim=True).mean(3, keepdim=True))
-        ctx_all = ctx_all + ctx_global * gates[:, self.focal_level:]
+        ctx_all = ctx_all + ctx_global * gates[:, self.focal_level :]
         if self.normalize_modulator:
             ctx_all = ctx_all / (self.focal_level + 1)
 
@@ -279,7 +287,7 @@ class FocalModulation(nn.Layer):
 
 
 class FocalModulationBlock(nn.Layer):
-    """ Focal Modulation Block.
+    """Focal Modulation Block.
     Args:
         dim (int): Number of input channels.
         mlp_ratio (float): Ratio of mlp hidden dim to embedding dim.
@@ -292,24 +300,26 @@ class FocalModulationBlock(nn.Layer):
         use_postln (bool): Whether use layernorm after modulation. Default: False.
         use_postln_in_modulation (bool): Whether use post-modulation layernorm. Default: False.
         normalize_modulator (bool): Whether use normalize in modulator
-        use_layerscale (bool): Whether use layerscale proposed in CaiT. Default: False 
-        layerscale_value (float): Value for layer scale. Default: 1e-4 
+        use_layerscale (bool): Whether use layerscale proposed in CaiT. Default: False
+        layerscale_value (float): Value for layer scale. Default: 1e-4
     """
 
-    def __init__(self,
-                 dim,
-                 mlp_ratio=4.,
-                 drop=0.,
-                 drop_path=0.,
-                 act_layer=nn.GELU,
-                 norm_layer=nn.LayerNorm,
-                 focal_level=2,
-                 focal_window=9,
-                 use_postln=False,
-                 use_postln_in_modulation=False,
-                 normalize_modulator=False,
-                 use_layerscale=False,
-                 layerscale_value=1e-4):
+    def __init__(
+        self,
+        dim,
+        mlp_ratio=4.0,
+        drop=0.0,
+        drop_path=0.0,
+        act_layer=nn.GELU,
+        norm_layer=nn.LayerNorm,
+        focal_level=2,
+        focal_window=9,
+        use_postln=False,
+        use_postln_in_modulation=False,
+        normalize_modulator=False,
+        use_layerscale=False,
+        layerscale_value=1e-4,
+    ):
         super().__init__()
         self.dim = dim
         self.mlp_ratio = mlp_ratio
@@ -325,25 +335,26 @@ class FocalModulationBlock(nn.Layer):
             focal_level=self.focal_level,
             focal_window=self.focal_window,
             use_postln_in_modulation=use_postln_in_modulation,
-            normalize_modulator=normalize_modulator)
+            normalize_modulator=normalize_modulator,
+        )
 
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else Identity()
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim,
-                       hidden_features=mlp_hidden_dim,
-                       act_layer=act_layer,
-                       drop=drop)
+        self.mlp = Mlp(
+            in_features=dim,
+            hidden_features=mlp_hidden_dim,
+            act_layer=act_layer,
+            drop=drop,
+        )
         self.H = None
         self.W = None
 
         self.gamma_1 = 1.0
         self.gamma_2 = 1.0
         if self.use_layerscale:
-            self.gamma_1 = add_parameter(self,
-                                         layerscale_value * paddle.ones([dim]))
-            self.gamma_2 = add_parameter(self,
-                                         layerscale_value * paddle.ones([dim]))
+            self.gamma_1 = add_parameter(self, layerscale_value * paddle.ones([dim]))
+            self.gamma_2 = add_parameter(self, layerscale_value * paddle.ones([dim]))
 
     def forward(self, x):
         """
@@ -375,7 +386,7 @@ class FocalModulationBlock(nn.Layer):
 
 
 class BasicLayer(nn.Layer):
-    """ A basic focal modulation layer for one stage.
+    """A basic focal modulation layer for one stage.
     Args:
         dim (int): Number of feature channels
         depth (int): Depths of this stage.
@@ -387,7 +398,7 @@ class BasicLayer(nn.Layer):
         focal_level (int): Number of focal levels
         focal_window (int): Focal window size at focal level 1
         use_conv_embed (bool): Whether use overlapped convolution for patch embedding
-        use_layerscale (bool): Whether use layerscale proposed in CaiT. Default: False 
+        use_layerscale (bool): Whether use layerscale proposed in CaiT. Default: False
         layerscale_value (float): Value of layerscale
         use_postln (bool): Whether use layernorm after modulation. Default: False.
         use_postln_in_modulation (bool): Whether use post-modulation layernorm. Default: False.
@@ -395,45 +406,52 @@ class BasicLayer(nn.Layer):
         use_checkpoint (bool): Whether to use checkpointing to save memory. Default: False.
     """
 
-    def __init__(self,
-                 dim,
-                 depth,
-                 mlp_ratio=4.,
-                 drop=0.,
-                 drop_path=0.,
-                 norm_layer=nn.LayerNorm,
-                 downsample=None,
-                 focal_level=2,
-                 focal_window=9,
-                 use_conv_embed=False,
-                 use_layerscale=False,
-                 layerscale_value=1e-4,
-                 use_postln=False,
-                 use_postln_in_modulation=False,
-                 normalize_modulator=False,
-                 use_checkpoint=False):
+    def __init__(
+        self,
+        dim,
+        depth,
+        mlp_ratio=4.0,
+        drop=0.0,
+        drop_path=0.0,
+        norm_layer=nn.LayerNorm,
+        downsample=None,
+        focal_level=2,
+        focal_window=9,
+        use_conv_embed=False,
+        use_layerscale=False,
+        layerscale_value=1e-4,
+        use_postln=False,
+        use_postln_in_modulation=False,
+        normalize_modulator=False,
+        use_checkpoint=False,
+    ):
         super().__init__()
         self.depth = depth
         self.use_checkpoint = use_checkpoint
 
         # build blocks
-        self.blocks = nn.LayerList([
-            FocalModulationBlock(
-                dim=dim,
-                mlp_ratio=mlp_ratio,
-                drop=drop,
-                drop_path=drop_path[i]
-                if isinstance(drop_path, np.ndarray) else drop_path,
-                act_layer=nn.GELU,
-                norm_layer=norm_layer,
-                focal_level=focal_level,
-                focal_window=focal_window,
-                use_postln=use_postln,
-                use_postln_in_modulation=use_postln_in_modulation,
-                normalize_modulator=normalize_modulator,
-                use_layerscale=use_layerscale,
-                layerscale_value=layerscale_value) for i in range(depth)
-        ])
+        self.blocks = nn.LayerList(
+            [
+                FocalModulationBlock(
+                    dim=dim,
+                    mlp_ratio=mlp_ratio,
+                    drop=drop,
+                    drop_path=drop_path[i]
+                    if isinstance(drop_path, np.ndarray)
+                    else drop_path,
+                    act_layer=nn.GELU,
+                    norm_layer=norm_layer,
+                    focal_level=focal_level,
+                    focal_window=focal_window,
+                    use_postln=use_postln,
+                    use_postln_in_modulation=use_postln_in_modulation,
+                    normalize_modulator=normalize_modulator,
+                    use_layerscale=use_layerscale,
+                    layerscale_value=layerscale_value,
+                )
+                for i in range(depth)
+            ]
+        )
 
         # patch merging layer
         if downsample is not None:
@@ -443,7 +461,8 @@ class BasicLayer(nn.Layer):
                 embed_dim=2 * dim,
                 use_conv_embed=use_conv_embed,
                 norm_layer=norm_layer,
-                is_stem=False)
+                is_stem=False,
+            )
         else:
             self.downsample = None
 
@@ -457,8 +476,7 @@ class BasicLayer(nn.Layer):
             x = blk(x)
 
         if self.downsample is not None:
-            x_reshaped = x.transpose([0, 2, 1]).reshape(
-                [x.shape[0], x.shape[-1], H, W])
+            x_reshaped = x.transpose([0, 2, 1]).reshape([x.shape[0], x.shape[-1], H, W])
             x_down = self.downsample(x_reshaped)
             x_down = x_down.flatten(2).transpose([0, 2, 1])
             Wh, Ww = (H + 1) // 2, (W + 1) // 2
@@ -468,23 +486,25 @@ class BasicLayer(nn.Layer):
 
 
 class PatchEmbed(nn.Layer):
-    """ Image to Patch Embedding
+    """Image to Patch Embedding
     Args:
         patch_size (int): Patch token size. Default: 4.
         in_chans (int): Number of input image channels. Default: 3.
         embed_dim (int): Number of linear projection output channels. Default: 96.
         norm_layer (nn.Layer, optional): Normalization layer. Default: None
         use_conv_embed (bool): Whether use overlapped convolution for patch embedding. Default: False
-        is_stem (bool): Is the stem block or not. 
+        is_stem (bool): Is the stem block or not.
     """
 
-    def __init__(self,
-                 patch_size=4,
-                 in_chans=3,
-                 embed_dim=96,
-                 norm_layer=None,
-                 use_conv_embed=False,
-                 is_stem=False):
+    def __init__(
+        self,
+        patch_size=4,
+        in_chans=3,
+        embed_dim=96,
+        norm_layer=None,
+        use_conv_embed=False,
+        is_stem=False,
+    ):
         super().__init__()
         patch_size = to_2tuple(patch_size)
         self.patch_size = patch_size
@@ -507,10 +527,12 @@ class PatchEmbed(nn.Layer):
                 embed_dim,
                 kernel_size=kernel_size,
                 stride=stride,
-                padding=padding)
+                padding=padding,
+            )
         else:
             self.proj = nn.Conv2D(
-                in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+                in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
+            )
 
         if norm_layer is not None:
             self.norm = norm_layer(embed_dim)
@@ -542,7 +564,7 @@ class PatchEmbed(nn.Layer):
 @register
 @serializable
 class FocalNet(nn.Layer):
-    """ FocalNet backbone
+    """FocalNet backbone
     Args:
         arch (str): Architecture of FocalNet
         out_indices (Sequence[int]): Output from which stages.
@@ -560,7 +582,7 @@ class FocalNet(nn.Layer):
         focal_levels (Sequence[int]): Number of focal levels at four stages
         focal_windows (Sequence[int]): Focal window sizes at first focal level at four stages
         use_conv_embed (bool): Whether use overlapped convolution for patch embedding
-        use_layerscale (bool): Whether use layerscale proposed in CaiT. Default: False 
+        use_layerscale (bool): Whether use layerscale proposed in CaiT. Default: False
         layerscale_value (float): Value of layerscale
         use_postln (bool): Whether use layernorm after modulation. Default: False.
         use_postln_in_modulation (bool): Whether use post-modulation layernorm. Default: False.
@@ -569,44 +591,45 @@ class FocalNet(nn.Layer):
     """
 
     def __init__(
-            self,
-            arch='focalnet_T_224_1k_srf',
-            out_indices=(0, 1, 2, 3),
-            frozen_stages=-1,
-            patch_size=4,
-            in_chans=3,
-            embed_dim=96,
-            depths=[2, 2, 6, 2],
-            mlp_ratio=4.,
-            drop_rate=0.,
-            drop_path_rate=0.2,  # 0.5 better for large+ models
-            norm_layer=nn.LayerNorm,
-            patch_norm=True,
-            focal_levels=[2, 2, 2, 2],
-            focal_windows=[3, 3, 3, 3],
-            use_conv_embed=False,
-            use_layerscale=False,
-            layerscale_value=1e-4,
-            use_postln=False,
-            use_postln_in_modulation=False,
-            normalize_modulator=False,
-            use_checkpoint=False,
-            pretrained=None):
+        self,
+        arch="focalnet_T_224_1k_srf",
+        out_indices=(0, 1, 2, 3),
+        frozen_stages=-1,
+        patch_size=4,
+        in_chans=3,
+        embed_dim=96,
+        depths=[2, 2, 6, 2],
+        mlp_ratio=4.0,
+        drop_rate=0.0,
+        drop_path_rate=0.2,  # 0.5 better for large+ models
+        norm_layer=nn.LayerNorm,
+        patch_norm=True,
+        focal_levels=[2, 2, 2, 2],
+        focal_windows=[3, 3, 3, 3],
+        use_conv_embed=False,
+        use_layerscale=False,
+        layerscale_value=1e-4,
+        use_postln=False,
+        use_postln_in_modulation=False,
+        normalize_modulator=False,
+        use_checkpoint=False,
+        pretrained=None,
+    ):
         super(FocalNet, self).__init__()
         assert arch in MODEL_cfg.keys(), "Unsupported arch: {}".format(arch)
 
-        embed_dim = MODEL_cfg[arch]['embed_dim']
-        depths = MODEL_cfg[arch]['depths']
-        drop_path_rate = MODEL_cfg[arch]['drop_path_rate']
-        focal_levels = MODEL_cfg[arch]['focal_levels']
-        focal_windows = MODEL_cfg[arch]['focal_windows']
-        use_conv_embed = MODEL_cfg[arch]['use_conv_embed']
-        use_layerscale = MODEL_cfg[arch]['use_layerscale']
-        use_postln = MODEL_cfg[arch]['use_postln']
-        use_postln_in_modulation = MODEL_cfg[arch]['use_postln_in_modulation']
-        normalize_modulator = MODEL_cfg[arch]['normalize_modulator']
+        embed_dim = MODEL_cfg[arch]["embed_dim"]
+        depths = MODEL_cfg[arch]["depths"]
+        drop_path_rate = MODEL_cfg[arch]["drop_path_rate"]
+        focal_levels = MODEL_cfg[arch]["focal_levels"]
+        focal_windows = MODEL_cfg[arch]["focal_windows"]
+        use_conv_embed = MODEL_cfg[arch]["use_conv_embed"]
+        use_layerscale = MODEL_cfg[arch]["use_layerscale"]
+        use_postln = MODEL_cfg[arch]["use_postln"]
+        use_postln_in_modulation = MODEL_cfg[arch]["use_postln_in_modulation"]
+        normalize_modulator = MODEL_cfg[arch]["normalize_modulator"]
         if pretrained is None:
-            pretrained = MODEL_cfg[arch]['pretrained']
+            pretrained = MODEL_cfg[arch]["pretrained"]
 
         self.out_indices = out_indices
         self.frozen_stages = frozen_stages
@@ -620,7 +643,8 @@ class FocalNet(nn.Layer):
             embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None,
             use_conv_embed=use_conv_embed,
-            is_stem=True)
+            is_stem=True,
+        )
 
         self.pos_drop = nn.Dropout(p=drop_rate)
 
@@ -635,10 +659,9 @@ class FocalNet(nn.Layer):
                 depth=depths[i_layer],
                 mlp_ratio=mlp_ratio,
                 drop=drop_rate,
-                drop_path=dpr[sum(depths[:i_layer]):sum(depths[:i_layer + 1])],
+                drop_path=dpr[sum(depths[:i_layer]) : sum(depths[: i_layer + 1])],
                 norm_layer=norm_layer,
-                downsample=PatchEmbed
-                if (i_layer < self.num_layers - 1) else None,
+                downsample=PatchEmbed if (i_layer < self.num_layers - 1) else None,
                 focal_level=focal_levels[i_layer],
                 focal_window=focal_windows[i_layer],
                 use_conv_embed=use_conv_embed,
@@ -647,7 +670,8 @@ class FocalNet(nn.Layer):
                 use_postln=use_postln,
                 use_postln_in_modulation=use_postln_in_modulation,
                 normalize_modulator=normalize_modulator,
-                use_checkpoint=use_checkpoint)
+                use_checkpoint=use_checkpoint,
+            )
             self.layers.append(layer)
 
         num_features = [int(embed_dim * 2**i) for i in range(self.num_layers)]
@@ -656,16 +680,15 @@ class FocalNet(nn.Layer):
         # add a norm layer for each output
         for i_layer in out_indices:
             layer = norm_layer(num_features[i_layer])
-            layer_name = f'norm{i_layer}'
+            layer_name = f"norm{i_layer}"
             self.add_sublayer(layer_name, layer)
 
         self.apply(self._init_weights)
         self._freeze_stages()
         if pretrained:
-            if 'http' in pretrained:  #URL
-                path = paddle.utils.download.get_weights_path_from_url(
-                    pretrained)
-            else:  #model in local path
+            if "http" in pretrained:  # URL
+                path = paddle.utils.download.get_weights_path_from_url(pretrained)
+            else:  # model in local path
                 path = pretrained
             self.set_state_dict(paddle.load(path))
 
@@ -693,7 +716,7 @@ class FocalNet(nn.Layer):
             ones_(m.weight)
 
     def forward(self, x):
-        x = self.patch_embed(x['image'])
+        x = self.patch_embed(x["image"])
         B, _, Wh, Ww = x.shape
         x = x.flatten(2).transpose([0, 2, 1])
         x = self.pos_drop(x)
@@ -702,10 +725,11 @@ class FocalNet(nn.Layer):
             layer = self.layers[i]
             x_out, H, W, x, Wh, Ww = layer(x, Wh, Ww)
             if i in self.out_indices:
-                norm_layer = getattr(self, f'norm{i}')
+                norm_layer = getattr(self, f"norm{i}")
                 x_out = norm_layer(x_out)
                 out = x_out.reshape([-1, H, W, self.num_features[i]]).transpose(
-                    (0, 3, 1, 2))
+                    (0, 3, 1, 2)
+                )
                 outs.append(out)
 
         return outs
@@ -714,7 +738,6 @@ class FocalNet(nn.Layer):
     def out_shape(self):
         out_strides = [4, 8, 16, 32]
         return [
-            ShapeSpec(
-                channels=self.num_features[i], stride=out_strides[i])
+            ShapeSpec(channels=self.num_features[i], stride=out_strides[i])
             for i in self.out_indices
         ]

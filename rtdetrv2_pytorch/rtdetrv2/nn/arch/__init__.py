@@ -1,6 +1,4 @@
-"""Copyright(c) 2023 lyuwenyu. All Rights Reserved.
-"""
+"""Copyright(c) 2023 lyuwenyu. All Rights Reserved."""
 
-
-from .classification import Classification, ClassHead
+from .classification import ClassHead, Classification
 from .yolo import YOLO

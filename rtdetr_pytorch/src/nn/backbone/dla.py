@@ -1,24 +1,22 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
-import math
 import logging
+import math
 from os.path import join
 
 import torch
-from torch import nn
 import torch.utils.model_zoo as model_zoo
+from torch import nn
+
 # from mmdet.models.builder import BACKBONES
 from src.core import register
-
 
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
 
 
-def get_model_url(data='imagenet', name='dla34', hash='ba72cf86'):
-    return join('http://dl.yf.io/dla/models', data, '{}-{}.pth'.format(name, hash))
+def get_model_url(data="imagenet", name="dla34", hash="ba72cf86"):
+    return join("http://dl.yf.io/dla/models", data, "{}-{}.pth".format(name, hash))
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -378,14 +376,14 @@ class DLA(nn.Module):
         y = []
         x = self.base_layer(x)
         for i in range(6):
-            x = getattr(self, 'level{}'.format(i))(x)
+            x = getattr(self, "level{}".format(i))(x)
             if i in self.out_indices:
                 y.append(x)
         return y
 
-    def load_pretrained_model(self, data='imagenet', name='dla34', hash='ba72cf86'):
+    def load_pretrained_model(self, data="imagenet", name="dla34", hash="ba72cf86"):
         # fc = self.fc
-        if name.endswith('.pth'):
+        if name.endswith(".pth"):
             model_weights = torch.load(data + name)
         else:
             model_url = get_model_url(data, name, hash)
@@ -397,18 +395,19 @@ class DLA(nn.Module):
 def dla34(pretrained=True, levels=None, in_channels=None, **kwargs):  # DLA-34
     model = DLA(levels=levels, channels=in_channels, block=BasicBlock, **kwargs)
     if pretrained:
-        model.load_pretrained_model(data='imagenet', name='dla34', hash='ba72cf86')
+        model.load_pretrained_model(data="imagenet", name="dla34", hash="ba72cf86")
     return model
+
 
 @register
 class DLANet(nn.Module):
     def __init__(
         self,
-        dla='dla34',
+        dla="dla34",
         pretrained=True,
         levels=[1, 1, 1, 2, 2, 1],
         in_channels=[16, 32, 64, 128, 256, 512],
-        return_index = [1, 2, 3],
+        return_index=[1, 2, 3],
         cfg=None,
     ):
         super(DLANet, self).__init__()
@@ -419,11 +418,12 @@ class DLANet(nn.Module):
             pretrained=pretrained, levels=levels, in_channels=in_channels
         )
         self.return_index = return_index
+
     def forward(self, x):
         x = self.model(x)
         max_list = max(self.return_index)
         min_list = min(self.return_index)
-        return x[min_list:max_list+1]
+        return x[min_list : max_list + 1]
 
 
 class Identity(nn.Module):

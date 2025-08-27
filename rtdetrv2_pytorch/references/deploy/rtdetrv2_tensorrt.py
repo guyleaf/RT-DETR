@@ -20,18 +20,21 @@
 # ==============================================================================
 
 import time
-import numpy as np
-import torch
-import tensorrt as trt
 from collections import OrderedDict
+
+import numpy as np
+import tensorrt as trt
+import torch
 from PIL import Image, ImageDraw, ImageFont
+
 
 class TRTInference(object):
     """
     A high-level wrapper for TensorRT inference, designed for ease of use and flexibility.
     This class handles engine loading, context creation, and dynamic buffer allocation.
     """
-    def __init__(self, engine_path, device='cuda:0', verbose=False):
+
+    def __init__(self, engine_path, device="cuda:0", verbose=False):
         """
         Initializes the TRTInference instance.
 
@@ -42,9 +45,11 @@ class TRTInference(object):
         """
         self.engine_path = engine_path
         self.device = torch.device(device)
-        self.logger = trt.Logger(trt.Logger.VERBOSE) if verbose else trt.Logger(trt.Logger.INFO)
-        
-        trt.init_libnvinfer_plugins(self.logger, '')
+        self.logger = (
+            trt.Logger(trt.Logger.VERBOSE) if verbose else trt.Logger(trt.Logger.INFO)
+        )
+
+        trt.init_libnvinfer_plugins(self.logger, "")
         self.runtime = trt.Runtime(self.logger)
         self.engine = self._load_engine(engine_path)
         self.context = self.engine.create_execution_context()
@@ -59,7 +64,7 @@ class TRTInference(object):
 
     def _load_engine(self, path):
         """Loads a TensorRT engine from a file."""
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             engine = self.runtime.deserialize_cuda_engine(f.read())
         if engine is None:
             raise RuntimeError(f"Failed to load TensorRT engine from '{path}'.")
@@ -95,7 +100,9 @@ class TRTInference(object):
             shape = tuple(self.context.get_tensor_shape(name))
             dtype = trt.nptype(self.engine.get_tensor_dtype(name))
             torch_dtype = torch.from_numpy(np.array(0, dtype=dtype)).dtype
-            self.gpu_buffers[name] = torch.empty(shape, dtype=torch_dtype, device=self.device)
+            self.gpu_buffers[name] = torch.empty(
+                shape, dtype=torch_dtype, device=self.device
+            )
             self.binding_addrs[name] = self.gpu_buffers[name].data_ptr()
             print(f"  - Output '{name}': allocated buffer with shape {shape}.")
 
@@ -116,28 +123,103 @@ class TRTInference(object):
         """
         if not self.buffers_allocated:
             self._allocate_buffers(blob)
-            
+
         for name in self.input_names:
             self.gpu_buffers[name].copy_(blob[name])
 
         self.context.execute_v2(bindings=list(self.binding_addrs.values()))
-        
+
         return {name: self.gpu_buffers[name] for name in self.output_names}
+
 
 # --- Visualization Utility Function ---
 COCO_CLASSES = [
-    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
-    'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-    'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-    'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard',
-    'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-    'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-    'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard',
-    'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
-    'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "airplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic light",
+    "fire hydrant",
+    "stop sign",
+    "parking meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "backpack",
+    "umbrella",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports ball",
+    "kite",
+    "baseball bat",
+    "baseball glove",
+    "skateboard",
+    "surfboard",
+    "tennis racket",
+    "bottle",
+    "wine glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "couch",
+    "potted plant",
+    "bed",
+    "dining table",
+    "toilet",
+    "tv",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy bear",
+    "hair drier",
+    "toothbrush",
 ]
 
-def visualize_detections(image_pil, boxes, scores, labels, class_names=COCO_CLASSES, threshold=0.5):
+
+def visualize_detections(
+    image_pil, boxes, scores, labels, class_names=COCO_CLASSES, threshold=0.5
+):
     """
     Draws bounding boxes on a PIL image. This function is a general-purpose utility.
 
@@ -154,30 +236,34 @@ def visualize_detections(image_pil, boxes, scores, labels, class_names=COCO_CLAS
     """
     img_draw = image_pil.copy()
     draw = ImageDraw.Draw(img_draw)
-    
+
     # Ensure tensors are on CPU and converted to NumPy for processing
     boxes = boxes.cpu().numpy()
     scores = scores.cpu().numpy()
     labels = labels.cpu().numpy()
-    
+
     count = 0
     for i in range(len(scores)):
         score = scores[i]
         if score < threshold:
             continue
-        
+
         count += 1
         box = boxes[i]
         label_idx = int(labels[i])
-        
+
         xmin, ymin, xmax, ymax = box
-        class_name = class_names[label_idx] if label_idx < len(class_names) else f'CLS-{label_idx}'
-        color = 'red' # Keep it simple or use a color map
-        
+        class_name = (
+            class_names[label_idx]
+            if label_idx < len(class_names)
+            else f"CLS-{label_idx}"
+        )
+        color = "red"  # Keep it simple or use a color map
+
         draw.rectangle(((xmin, ymin), (xmax, ymax)), outline=color, width=3)
-        
+
         text = f"{class_name}: {score:.2f}"
-        
+
         try:
             font = ImageFont.truetype("arial.ttf", 20)
         except IOError:
@@ -186,47 +272,66 @@ def visualize_detections(image_pil, boxes, scores, labels, class_names=COCO_CLAS
         text_bbox = draw.textbbox((xmin, ymin), text, font=font)
         draw.rectangle(text_bbox, fill=color)
         draw.text((xmin, ymin), text, fill="white", font=font)
-        
+
     print(f"   - Found {count} objects above threshold {threshold}.")
     return img_draw
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import argparse
-    import torchvision.transforms as T
     import os
 
-    parser = argparse.ArgumentParser(description="Test script for the TRTInference wrapper.")
-    parser.add_argument('--engine', type=str, required=True, help="Path to the TensorRT engine file.")
-    parser.add_argument('--image', type=str, required=True, help="Path to the input image file.")
-    parser.add_argument('--output', type=str, default='output.jpg', help="Path to save the output image with detections.")
-    parser.add_argument('--device', type=str, default='cuda:0', help="Device to run inference on.")
-    parser.add_argument('--threshold', type=float, default=0.5, help="Confidence threshold for displaying detections.")
+    import torchvision.transforms as T
+
+    parser = argparse.ArgumentParser(
+        description="Test script for the TRTInference wrapper."
+    )
+    parser.add_argument(
+        "--engine", type=str, required=True, help="Path to the TensorRT engine file."
+    )
+    parser.add_argument(
+        "--image", type=str, required=True, help="Path to the input image file."
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="output.jpg",
+        help="Path to save the output image with detections.",
+    )
+    parser.add_argument(
+        "--device", type=str, default="cuda:0", help="Device to run inference on."
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.5,
+        help="Confidence threshold for displaying detections.",
+    )
     args = parser.parse_args()
-    
+
     if not torch.cuda.is_available():
         raise SystemExit("CUDA is not available. This script requires a GPU.")
-    
+
     print("--- TRTInference Wrapper Test ---")
-    
+
     print("\n1. Initializing TRTInference...")
     trt_model = TRTInference(args.engine, device=args.device)
-    
+
     print("\n2. Preprocessing input image...")
-    image_pil = Image.open(args.image).convert('RGB')
+    image_pil = Image.open(args.image).convert("RGB")
     w, h = image_pil.size
-    
-    transforms = T.Compose([
-        T.Resize((640, 640)),
-        T.ToTensor(),
-    ])
-    
+
+    transforms = T.Compose(
+        [
+            T.Resize((640, 640)),
+            T.ToTensor(),
+        ]
+    )
+
     image_tensor = transforms(image_pil).unsqueeze(0).to(args.device)
     orig_size_tensor = torch.tensor([[w, h]], dtype=torch.int64, device=args.device)
 
-    blob = {
-        'images': image_tensor,
-        'orig_target_sizes': orig_size_tensor
-    }
+    blob = {"images": image_tensor, "orig_target_sizes": orig_size_tensor}
     print(f"   - Original image size: {w}x{h}")
     print(f"   - Input tensor shape: {image_tensor.shape}")
 
@@ -235,23 +340,19 @@ if __name__ == '__main__':
     output_gpu = trt_model(blob)
     torch.cuda.synchronize()
     end_time = time.time()
-    
-    print(f"\n4. Inference complete in { (end_time - start_time) * 1000:.2f} ms.")
-    
+
+    print(f"\n4. Inference complete in {(end_time - start_time) * 1000:.2f} ms.")
+
     print("\n5. Post-processing and saving output image...")
-    output_labels = output_gpu['labels'][0]
-    output_boxes = output_gpu['boxes'][0]
-    output_scores = output_gpu['scores'][0]
-    
+    output_labels = output_gpu["labels"][0]
+    output_boxes = output_gpu["boxes"][0]
+    output_scores = output_gpu["scores"][0]
+
     # Use the new, separate visualization function
     result_image = visualize_detections(
-        image_pil, 
-        output_boxes, 
-        output_scores, 
-        output_labels, 
-        threshold=args.threshold
+        image_pil, output_boxes, output_scores, output_labels, threshold=args.threshold
     )
-    
+
     result_image.save(args.output)
     print(f"   - Output image with detections saved to: {os.path.abspath(args.output)}")
 

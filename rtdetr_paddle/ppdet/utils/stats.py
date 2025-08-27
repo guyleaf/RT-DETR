@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import collections
+
 import numpy as np
 
-__all__ = ['SmoothedValue', 'TrainingStats']
+__all__ = ["SmoothedValue", "TrainingStats"]
 
 
 class SmoothedValue(object):
@@ -28,7 +29,7 @@ class SmoothedValue(object):
             fmt = "{median:.4f} ({avg:.4f})"
         self.deque = collections.deque(maxlen=window_size)
         self.fmt = fmt
-        self.total = 0.
+        self.total = 0.0
         self.count = 0
 
     def update(self, value, n=1):
@@ -58,31 +59,29 @@ class SmoothedValue(object):
 
     def __str__(self):
         return self.fmt.format(
-            median=self.median, avg=self.avg, max=self.max, value=self.value)
+            median=self.median, avg=self.avg, max=self.max, value=self.value
+        )
 
 
 class TrainingStats(object):
-    def __init__(self, window_size, delimiter=' '):
+    def __init__(self, window_size, delimiter=" "):
         self.meters = None
         self.window_size = window_size
         self.delimiter = delimiter
 
     def update(self, stats):
         if self.meters is None:
-            self.meters = {
-                k: SmoothedValue(self.window_size)
-                for k in stats.keys()
-            }
+            self.meters = {k: SmoothedValue(self.window_size) for k in stats.keys()}
         for k, v in self.meters.items():
             v.update(float(stats[k]))
-            
+
     def get(self, extras=None):
         stats = collections.OrderedDict()
         if extras:
             for k, v in extras.items():
                 stats[k] = v
         for k, v in self.meters.items():
-            stats[k] = format(v.median, '.6f')
+            stats[k] = format(v.median, ".6f")
 
         return stats
 

@@ -15,26 +15,25 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-
-from paddle.nn.initializer import TruncatedNormal, Constant, Assign
+from paddle.nn.initializer import Assign, Constant, TruncatedNormal
 
 # Common initializations
-ones_ = Constant(value=1.)
-zeros_ = Constant(value=0.)
-trunc_normal_ = TruncatedNormal(std=.02)
+ones_ = Constant(value=1.0)
+zeros_ = Constant(value=0.0)
+trunc_normal_ = TruncatedNormal(std=0.02)
 
 
 # Common Layers
-def drop_path(x, drop_prob=0., training=False):
+def drop_path(x, drop_prob=0.0, training=False):
     """
-        Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
-        the original name is misleading as 'Drop Connect' is a different form of dropout in a separate paper...
-        See discussion: https://github.com/tensorflow/tpu/issues/494#issuecomment-532968956 ...
+    Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
+    the original name is misleading as 'Drop Connect' is a different form of dropout in a separate paper...
+    See discussion: https://github.com/tensorflow/tpu/issues/494#issuecomment-532968956 ...
     """
-    if drop_prob == 0. or not training:
+    if drop_prob == 0.0 or not training:
         return x
     keep_prob = paddle.to_tensor(1 - drop_prob, dtype=x.dtype)
-    shape = (paddle.shape(x)[0], ) + (1, ) * (x.ndim - 1)
+    shape = (paddle.shape(x)[0],) + (1,) * (x.ndim - 1)
     random_tensor = keep_prob + paddle.rand(shape, dtype=x.dtype)
     random_tensor = paddle.floor(random_tensor)  # binarize
     output = x.divide(keep_prob) * random_tensor
@@ -69,7 +68,8 @@ def to_2tuple(x):
 
 def add_parameter(layer, datas, name=None):
     parameter = layer.create_parameter(
-        shape=(datas.shape), default_initializer=Assign(datas))
+        shape=(datas.shape), default_initializer=Assign(datas)
+    )
     if name:
         layer.add_parameter(name, parameter)
     return parameter
@@ -89,17 +89,16 @@ def window_partition(x, window_size):
 
     pad_h = (window_size - H % window_size) % window_size
     pad_w = (window_size - W % window_size) % window_size
-    x = F.pad(x.transpose([0, 3, 1, 2]),
-              paddle.to_tensor(
-                  [0, int(pad_w), 0, int(pad_h)],
-                  dtype='int32')).transpose([0, 2, 3, 1])
+    x = F.pad(
+        x.transpose([0, 3, 1, 2]),
+        paddle.to_tensor([0, int(pad_w), 0, int(pad_h)], dtype="int32"),
+    ).transpose([0, 2, 3, 1])
     Hp, Wp = H + pad_h, W + pad_w
 
     num_h, num_w = Hp // window_size, Wp // window_size
 
     x = x.reshape([B, num_h, window_size, num_w, window_size, C])
-    windows = x.transpose([0, 1, 3, 2, 4, 5]).reshape(
-        [-1, window_size, window_size, C])
+    windows = x.transpose([0, 1, 3, 2, 4, 5]).reshape([-1, window_size, window_size, C])
     return windows, (Hp, Wp), (num_h, num_w)
 
 
