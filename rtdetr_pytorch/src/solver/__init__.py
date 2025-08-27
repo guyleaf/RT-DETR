@@ -1,12 +1,10 @@
-"""by lyuwenyu
-"""
+"""by lyuwenyu"""
 
-from .solver import BaseSolver
+from typing import Dict
+
 from .det_solver import DetSolver
+from .solver import BaseSolver
 
-
-from typing import Dict 
-
-TASKS :Dict[str, BaseSolver] = {
-    'detection': DetSolver,
+TASKS: Dict[str, BaseSolver] = {
+    "detection": DetSolver,
 }

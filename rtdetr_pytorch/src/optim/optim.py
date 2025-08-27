@@ -1,14 +1,19 @@
-
-import torch 
-import torch.nn as nn 
+import torch
+import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 
 from src.core import register
 
-
-__all__ = ['AdamW', 'SGD', 'Adam', 'MultiStepLR', 'CosineAnnealingLR', 'OneCycleLR', 'LambdaLR']
-
+__all__ = [
+    "AdamW",
+    "SGD",
+    "Adam",
+    "MultiStepLR",
+    "CosineAnnealingLR",
+    "OneCycleLR",
+    "LambdaLR",
+]
 
 
 SGD = register(optim.SGD)

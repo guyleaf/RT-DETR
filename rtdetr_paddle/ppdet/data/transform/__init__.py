@@ -12,14 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import operators
-from . import batch_operators
-
-
-from .operators import *
+from . import batch_operators, operators
 from .batch_operators import *
-
+from .operators import *
 
 __all__ = []
 __all__ += registered_ops
-

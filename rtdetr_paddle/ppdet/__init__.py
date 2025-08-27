@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import (core, data, engine, modeling, optimizer, metrics, utils)
-
+from . import core, data, engine, metrics, modeling, optimizer, utils
 
 try:
-    from .version import full_version as __version__
     from .version import commit as __git_commit__
+    from .version import full_version as __version__
 except ImportError:
     import sys
-    sys.stderr.write("Warning: import ppdet from source directory " \
-            "without installing, run 'python setup.py install' to " \
-            "install ppdet firstly\n")
+
+    sys.stderr.write(
+        "Warning: import ppdet from source directory "
+        "without installing, run 'python setup.py install' to "
+        "install ppdet firstly\n"
+    )

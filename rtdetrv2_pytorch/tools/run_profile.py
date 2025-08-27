@@ -1,6 +1,4 @@
-
-"""Copyright(c) 2023 lyuwenyu. All Rights Reserved.
-"""
+"""Copyright(c) 2023 lyuwenyu. All Rights Reserved."""
 
 import os
 import re
@@ -10,20 +8,20 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from typing import Any, Dict, List, Optional
 
 from rtdetrv2.core import YAMLConfig
 
 __all__ = ["profile_stats"]
 
+
 def profile_stats(
-    model: nn.Module, 
-    data: Optional[Tensor]=None, 
-    shape: List[int]=[1, 3, 640, 640], 
-    verbose: bool=False
+    model: nn.Module,
+    data: Optional[Tensor] = None,
+    shape: List[int] = [1, 3, 640, 640],
+    verbose: bool = False,
 ) -> Dict[str, Any]:
-    
     is_training = model.training
 
     model.train()
@@ -38,7 +36,7 @@ def profile_stats(
         print(device)
 
     def trace_handler(prof):
-        print(prof.key_averages().table(sort_by='self_cuda_time_total', row_limit=-1))
+        print(prof.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1))
 
     wait = 0
     warmup = 1
@@ -66,24 +64,32 @@ def profile_stats(
 
     if is_training:
         model.train()
-    
-    info = p.key_averages().table(sort_by='self_cuda_time_total', row_limit=-1)
-    num_flops = sum([float(v.strip()) for v in re.findall('(\d+.?\d+ *\n)', info)]) / active
+
+    info = p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1)
+    num_flops = (
+        sum([float(v.strip()) for v in re.findall("(\d+.?\d+ *\n)", info)]) / active
+    )
 
     if verbose:
         print(info)
-        print(f'Total number of trainable parameters: {num_params}')
-        print(f'Total number of flops: {int(num_flops)}M with {shape}')
+        print(f"Total number of trainable parameters: {num_params}")
+        print(f"Total number of flops: {int(num_flops)}M with {shape}")
 
-    return {'n_parameters': num_params, 'n_flops': num_flops, 'info': info}
-
+    return {"n_parameters": num_params, "n_flops": num_flops, "info": info}
 
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, required=True)
-    parser.add_argument('-d', '--device', type=str, default='cuda:0', help='device',)
+    parser.add_argument("-c", "--config", type=str, required=True)
+    parser.add_argument(
+        "-d",
+        "--device",
+        type=str,
+        default="cuda:0",
+        help="device",
+    )
     args = parser.parse_args()
 
     cfg = YAMLConfig(args.config, device=args.device)

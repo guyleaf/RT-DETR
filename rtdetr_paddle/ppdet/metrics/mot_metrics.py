@@ -1,46 +1,48 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved. 
-#   
-# Licensed under the Apache License, Version 2.0 (the "License");   
-# you may not use this file except in compliance with the License.  
-# You may obtain a copy of the License at   
-#   
-#     http://www.apache.org/licenses/LICENSE-2.0    
-#   
-# Unless required by applicable law or agreed to in writing, software   
-# distributed under the License is distributed on an "AS IS" BASIS, 
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  
-# See the License for the specific language governing permissions and   
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
-import os
 import copy
-import sys
 import math
+import os
+import sys
 from collections import defaultdict
+
 import numpy as np
 
 from ppdet.modeling.bbox_utils import bbox_iou_np_expand
+
 from .map_utils import ap_per_class
 from .metrics import Metric
 from .munkres import Munkres
 
 try:
     import motmetrics as mm
-    mm.lap.default_solver = 'lap'
+
+    mm.lap.default_solver = "lap"
 except:
     print(
-        'Warning: Unable to use MOT metric, please install motmetrics, for example: `pip install motmetrics`, see https://github.com/longcw/py-motmetrics'
+        "Warning: Unable to use MOT metric, please install motmetrics, for example: `pip install motmetrics`, see https://github.com/longcw/py-motmetrics"
     )
     pass
 
 from ppdet.utils.logger import setup_logger
+
 logger = setup_logger(__name__)
 
-__all__ = ['MOTEvaluator', 'MOTMetric', 'JDEDetMetric', 'KITTIMOTMetric']
+__all__ = ["MOTEvaluator", "MOTMetric", "JDEDetMetric", "KITTIMOTMetric"]
 
 
 def read_mot_results(filename, is_gt=False, is_ignore=False):
@@ -50,12 +52,14 @@ def read_mot_results(filename, is_gt=False, is_ignore=False):
         logger.info(
             "In MOT16/17 dataset the valid_label of ground truth is '{}', "
             "in other dataset it should be '0' for single classs MOT.".format(
-                valid_label[0]))
+                valid_label[0]
+            )
+        )
     results_dict = dict()
     if os.path.isfile(filename):
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             for line in f.readlines():
-                linelist = line.split(',')
+                linelist = line.split(",")
                 if len(linelist) < 7:
                     continue
                 fid = int(linelist[0])
@@ -70,7 +74,12 @@ def read_mot_results(filename, is_gt=False, is_ignore=False):
                         continue
                     score = 1
                 elif is_ignore:
-                    if 'MOT16-' in filename or 'MOT17-' in filename or 'MOT15-' in filename or 'MOT20-' in filename:
+                    if (
+                        "MOT16-" in filename
+                        or "MOT17-" in filename
+                        or "MOT15-" in filename
+                        or "MOT20-" in filename
+                    ):
                         label = int(float(linelist[7]))
                         vis_ratio = float(linelist[8])
                         if label not in ignore_labels and vis_ratio >= 0:
@@ -125,24 +134,23 @@ class MOTEvaluator(object):
         self.load_annotations()
         try:
             import motmetrics as mm
-            mm.lap.default_solver = 'lap'
+
+            mm.lap.default_solver = "lap"
         except Exception as e:
             raise RuntimeError(
-                'Unable to use MOT metric, please install motmetrics, for example: `pip install motmetrics`, see https://github.com/longcw/py-motmetrics'
+                "Unable to use MOT metric, please install motmetrics, for example: `pip install motmetrics`, see https://github.com/longcw/py-motmetrics"
             )
         self.reset_accumulator()
 
     def load_annotations(self):
-        assert self.data_type == 'mot'
-        gt_filename = os.path.join(self.data_root, self.seq_name, 'gt',
-                                   'gt.txt')
+        assert self.data_type == "mot"
+        gt_filename = os.path.join(self.data_root, self.seq_name, "gt", "gt.txt")
         if not os.path.exists(gt_filename):
             logger.warning(
                 "gt_filename '{}' of MOTEvaluator is not exist, so the MOTA will be -INF."
             )
         self.gt_frame_dict = read_mot_results(gt_filename, is_gt=True)
-        self.gt_ignore_frame_dict = read_mot_results(
-            gt_filename, is_ignore=True)
+        self.gt_ignore_frame_dict = read_mot_results(gt_filename, is_ignore=True)
 
     def reset_accumulator(self):
         self.acc = mm.MOTAccumulator(auto_id=True)
@@ -162,11 +170,12 @@ class MOTEvaluator(object):
 
         # remove ignored results
         keep = np.ones(len(trk_tlwhs), dtype=bool)
-        iou_distance = mm.distances.iou_matrix(
-            ignore_tlwhs, trk_tlwhs, max_iou=0.5)
+        iou_distance = mm.distances.iou_matrix(ignore_tlwhs, trk_tlwhs, max_iou=0.5)
         if len(iou_distance) > 0:
             match_is, match_js = mm.lap.linear_sum_assignment(iou_distance)
-            match_is, match_js = map(lambda a: np.asarray(a, dtype=int), [match_is, match_js])
+            match_is, match_js = map(
+                lambda a: np.asarray(a, dtype=int), [match_is, match_js]
+            )
             match_ious = iou_distance[match_is, match_js]
 
             match_js = np.asarray(match_js, dtype=int)
@@ -181,9 +190,14 @@ class MOTEvaluator(object):
         # acc
         self.acc.update(gt_ids, trk_ids, iou_distance)
 
-        if rtn_events and iou_distance.size > 0 and hasattr(self.acc,
-                                                            'last_mot_events'):
-            events = self.acc.last_mot_events  # only supported by https://github.com/longcw/py-motmetrics
+        if (
+            rtn_events
+            and iou_distance.size > 0
+            and hasattr(self.acc, "last_mot_events")
+        ):
+            events = (
+                self.acc.last_mot_events
+            )  # only supported by https://github.com/longcw/py-motmetrics
         else:
             events = None
         return events
@@ -201,10 +215,11 @@ class MOTEvaluator(object):
         return self.acc
 
     @staticmethod
-    def get_summary(accs,
-                    names,
-                    metrics=('mota', 'num_switches', 'idp', 'idr', 'idf1',
-                             'precision', 'recall')):
+    def get_summary(
+        accs,
+        names,
+        metrics=("mota", "num_switches", "idp", "idr", "idf1", "precision", "recall"),
+    ):
         names = copy.deepcopy(names)
         if metrics is None:
             metrics = mm.metrics.motchallenge_metrics
@@ -212,12 +227,14 @@ class MOTEvaluator(object):
 
         mh = mm.metrics.create()
         summary = mh.compute_many(
-            accs, metrics=metrics, names=names, generate_overall=True)
+            accs, metrics=metrics, names=names, generate_overall=True
+        )
         return summary
 
     @staticmethod
     def save_summary(summary, filename):
         import pandas as pd
+
         writer = pd.ExcelWriter(filename)
         summary.to_excel(writer)
         writer.save()
@@ -245,12 +262,12 @@ class MOTMetric(Metric):
         mh = mm.metrics.create()
         summary = self.MOTEvaluator.get_summary(self.accs, self.seqs, metrics)
         self.strsummary = mm.io.render_summary(
-            summary,
-            formatters=mh.formatters,
-            namemap=mm.io.motchallenge_metric_names)
+            summary, formatters=mh.formatters, namemap=mm.io.motchallenge_metric_names
+        )
         if self.save_summary:
             self.MOTEvaluator.save_summary(
-                summary, os.path.join(self.result_root, 'summary.xlsx'))
+                summary, os.path.join(self.result_root, "summary.xlsx")
+            )
 
     def log(self):
         print(self.strsummary)
@@ -271,15 +288,15 @@ class JDEDetMetric(Metric):
         self.AP_accum_count = np.zeros(1)
 
     def update(self, inputs, outputs):
-        bboxes = outputs['bbox'][:, 2:].numpy()
-        scores = outputs['bbox'][:, 1].numpy()
-        labels = outputs['bbox'][:, 0].numpy()
-        bbox_lengths = outputs['bbox_num'].numpy()
+        bboxes = outputs["bbox"][:, 2:].numpy()
+        scores = outputs["bbox"][:, 1].numpy()
+        labels = outputs["bbox"][:, 0].numpy()
+        bbox_lengths = outputs["bbox_num"].numpy()
         if bboxes.shape[0] == 1 and bboxes.sum() == 0.0:
             return
 
-        gt_boxes = inputs['gt_bbox'].numpy()[0]
-        gt_labels = inputs['gt_class'].numpy()[0]
+        gt_boxes = inputs["gt_bbox"].numpy()[0]
+        gt_labels = inputs["gt_class"].numpy()[0]
         if gt_labels.shape[0] == 0:
             return
 
@@ -293,8 +310,11 @@ class JDEDetMetric(Metric):
             # Extract index of largest overlap
             best_i = np.argmax(iou)
             # If overlap exceeds threshold and classification is correct mark as correct
-            if iou[best_i] > self.overlap_thresh and obj_pred == gt_labels[
-                    best_i] and best_i not in detected:
+            if (
+                iou[best_i] > self.overlap_thresh
+                and obj_pred == gt_labels[best_i]
+                and best_i not in detected
+            ):
                 correct.append(1)
                 detected.append(best_i)
             else:
@@ -306,18 +326,18 @@ class JDEDetMetric(Metric):
             tp=correct,
             conf=scores,
             pred_cls=np.zeros_like(scores),
-            target_cls=target_cls)
+            target_cls=target_cls,
+        )
         self.AP_accum_count += np.bincount(AP_class, minlength=1)
         self.AP_accum += np.bincount(AP_class, minlength=1, weights=AP)
 
     def accumulate(self):
         logger.info("Accumulating evaluatation results...")
-        self.map_stat = self.AP_accum[0] / (self.AP_accum_count[0] + 1E-16)
+        self.map_stat = self.AP_accum[0] / (self.AP_accum_count[0] + 1e-16)
 
     def log(self):
-        map_stat = 100. * self.map_stat
-        logger.info("mAP({:.2f}) = {:.2f}%".format(self.overlap_thresh,
-                                                   map_stat))
+        map_stat = 100.0 * self.map_stat
+        logger.info("mAP({:.2f}) = {:.2f}%".format(self.overlap_thresh, map_stat))
 
     def get_results(self):
         return self.map_stat
@@ -330,13 +350,32 @@ Following code is borrow from https://github.com/xingyizhou/CenterTrack/blob/mas
 
 class tData:
     """
-        Utility class to load data.
+    Utility class to load data.
     """
-    def __init__(self,frame=-1,obj_type="unset",truncation=-1,occlusion=-1,\
-                 obs_angle=-10,x1=-1,y1=-1,x2=-1,y2=-1,w=-1,h=-1,l=-1,\
-                 X=-1000,Y=-1000,Z=-1000,yaw=-10,score=-1000,track_id=-1):
+
+    def __init__(
+        self,
+        frame=-1,
+        obj_type="unset",
+        truncation=-1,
+        occlusion=-1,
+        obs_angle=-10,
+        x1=-1,
+        y1=-1,
+        x2=-1,
+        y2=-1,
+        w=-1,
+        h=-1,
+        l=-1,
+        X=-1000,
+        Y=-1000,
+        Z=-1000,
+        yaw=-10,
+        score=-1000,
+        track_id=-1,
+    ):
         """
-            Constructor, initializes the object given the parameters.
+        Constructor, initializes the object given the parameters.
         """
         self.frame = frame
         self.track_id = track_id
@@ -362,29 +401,40 @@ class tData:
 
     def __str__(self):
         attrs = vars(self)
-        return '\n'.join("%s: %s" % item for item in attrs.items())
+        return "\n".join("%s: %s" % item for item in attrs.items())
 
 
 class KITTIEvaluation(object):
-    """ KITTI tracking statistics (CLEAR MOT, id-switches, fragments, ML/PT/MT, precision/recall)
-             MOTA	- Multi-object tracking accuracy in [0,100]
-             MOTP	- Multi-object tracking precision in [0,100] (3D) / [td,100] (2D)
-             MOTAL	- Multi-object tracking accuracy in [0,100] with log10(id-switches)
+    """KITTI tracking statistics (CLEAR MOT, id-switches, fragments, ML/PT/MT, precision/recall)
+    MOTA	- Multi-object tracking accuracy in [0,100]
+    MOTP	- Multi-object tracking precision in [0,100] (3D) / [td,100] (2D)
+    MOTAL	- Multi-object tracking accuracy in [0,100] with log10(id-switches)
 
-             id-switches - number of id switches
-             fragments   - number of fragmentations
+    id-switches - number of id switches
+    fragments   - number of fragmentations
 
-             MT, PT, ML	- number of mostly tracked, partially tracked and mostly lost trajectories
+    MT, PT, ML	- number of mostly tracked, partially tracked and mostly lost trajectories
 
-             recall	        - recall = percentage of detected targets
-             precision	    - precision = percentage of correctly detected targets
-             FAR		    - number of false alarms per frame
-             falsepositives - number of false positives (FP)
-             missed         - number of missed targets (FN)
+    recall	        - recall = percentage of detected targets
+    precision	    - precision = percentage of correctly detected targets
+    FAR		    - number of false alarms per frame
+    falsepositives - number of false positives (FP)
+    missed         - number of missed targets (FN)
     """
-    def __init__(self, result_path, gt_path, min_overlap=0.5, max_truncation = 0,\
-                min_height = 25, max_occlusion = 2, cls="car",\
-                n_frames=[], seqs=[], n_sequences=0):
+
+    def __init__(
+        self,
+        result_path,
+        gt_path,
+        min_overlap=0.5,
+        max_truncation=0,
+        min_height=25,
+        max_occlusion=2,
+        cls="car",
+        n_frames=[],
+        seqs=[],
+        n_sequences=0,
+    ):
         # get number of sequences and
         # get number of frames per sequence from test mapping
         # (created while extracting the benchmark)
@@ -400,15 +450,12 @@ class KITTIEvaluation(object):
         # statistics and numbers for evaluation
         self.n_gt = 0  # number of ground truth detections minus ignored false negatives and true positives
         self.n_igt = 0  # number of ignored ground truth detections
-        self.n_gts = [
-        ]  # number of ground truth detections minus ignored false negatives and true positives PER SEQUENCE
-        self.n_igts = [
-        ]  # number of ground ignored truth detections PER SEQUENCE
+        self.n_gts = []  # number of ground truth detections minus ignored false negatives and true positives PER SEQUENCE
+        self.n_igts = []  # number of ground ignored truth detections PER SEQUENCE
         self.n_gt_trajectories = 0
         self.n_gt_seq = []
         self.n_tr = 0  # number of tracker detections minus ignored tracker detections
-        self.n_trs = [
-        ]  # number of tracker detections minus ignored tracker detections PER SEQUENCE
+        self.n_trs = []  # number of tracker detections minus ignored tracker detections PER SEQUENCE
         self.n_itr = 0  # number of ignored tracker detections
         self.n_itrs = []  # number of ignored tracker detections PER SEQUENCE
         self.n_igttr = 0  # number of ignored ground truth detections where the corresponding associated tracker detection is also ignored
@@ -428,15 +475,13 @@ class KITTIEvaluation(object):
         self.itp = 0  # number of ignored true positives
         self.itps = []  # number of ignored true positives PER SEQUENCE
         self.tp = 0  # number of true positives including ignored true positives!
-        self.tps = [
-        ]  # number of true positives including ignored true positives PER SEQUENCE
+        self.tps = []  # number of true positives including ignored true positives PER SEQUENCE
         self.fn = 0  # number of false negatives WITHOUT ignored false negatives
-        self.fns = [
-        ]  # number of false negatives WITHOUT ignored false negatives PER SEQUENCE
+        self.fns = []  # number of false negatives WITHOUT ignored false negatives PER SEQUENCE
         self.ifn = 0  # number of ignored false negatives
         self.ifns = []  # number of ignored false negatives PER SEQUENCE
         self.fp = 0  # number of false positives
-        # a bit tricky, the number of ignored false negatives and ignored true positives 
+        # a bit tricky, the number of ignored false negatives and ignored true positives
         # is subtracted, but if both tracker detection and ground truth detection
         # are ignored this number is added again to avoid double counting
         self.fps = []  # above PER SEQUENCE
@@ -447,9 +492,15 @@ class KITTIEvaluation(object):
         self.PT = 0
         self.ML = 0
 
-        self.min_overlap = min_overlap  # minimum bounding box overlap for 3rd party metrics
-        self.max_truncation = max_truncation  # maximum truncation of an object for evaluation
-        self.max_occlusion = max_occlusion  # maximum occlusion of an object for evaluation
+        self.min_overlap = (
+            min_overlap  # minimum bounding box overlap for 3rd party metrics
+        )
+        self.max_truncation = (
+            max_truncation  # maximum truncation of an object for evaluation
+        )
+        self.max_occlusion = (
+            max_occlusion  # maximum occlusion of an object for evaluation
+        )
         self.min_height = min_height  # minimum height of an object for evaluation
         self.n_sample_points = 500
 
@@ -468,21 +519,18 @@ class KITTIEvaluation(object):
     def loadTracker(self):
         try:
             if not self._loadData(
-                    self.result_path, cls=self.cls, loading_groundtruth=False):
+                self.result_path, cls=self.cls, loading_groundtruth=False
+            ):
                 return False
         except IOError:
             return False
         return True
 
-    def _loadData(self,
-                  root_dir,
-                  cls,
-                  min_score=-1000,
-                  loading_groundtruth=False):
+    def _loadData(self, root_dir, cls, min_score=-1000, loading_groundtruth=False):
         """
-            Generic loader for ground truth and tracking data.
-            Use loadGroundtruth() or loadTracker() to load this data.
-            Loads detections in KITTI format from textfiles.
+        Generic loader for ground truth and tracking data.
+        Use loadGroundtruth() or loadTracker() to load this data.
+        Loads detections in KITTI format from textfiles.
         """
         # construct objectDetections object to hold detection data
         t_data = tData()
@@ -523,11 +571,10 @@ class KITTIEvaluation(object):
                 t_data.frame = int(float(fields[0]))  # frame
                 t_data.track_id = int(float(fields[1]))  # id
                 t_data.obj_type = fields[
-                    2].lower()  # object type [car, pedestrian, cyclist, ...]
-                t_data.truncation = int(
-                    float(fields[3]))  # truncation [-1,0,1,2]
-                t_data.occlusion = int(
-                    float(fields[4]))  # occlusion  [-1,0,1,2]
+                    2
+                ].lower()  # object type [car, pedestrian, cyclist, ...]
+                t_data.truncation = int(float(fields[3]))  # truncation [-1,0,1,2]
+                t_data.occlusion = int(float(fields[4]))  # occlusion  [-1,0,1,2]
                 t_data.obs_angle = float(fields[5])  # observation angle [rad]
                 t_data.x1 = float(fields[6])  # left   [px]
                 t_data.y1 = float(fields[7])  # top    [px]
@@ -563,12 +610,14 @@ class KITTIEvaluation(object):
                     if id_frame in id_frame_cache and not loading_groundtruth:
                         logger.info(
                             "track ids are not unique for sequence %d: frame %d"
-                            % (seq, t_data.frame))
+                            % (seq, t_data.frame)
+                        )
                         logger.info(
                             "track id %d occurred at least twice for this frame"
-                            % t_data.track_id)
+                            % t_data.track_id
+                        )
                         logger.info("Exiting...")
-                        #continue # this allows to evaluate non-unique result files
+                        # continue # this allows to evaluate non-unique result files
                         return False
                     id_frame_cache.append(id_frame)
                     f_data[t_data.frame].append(copy.copy(t_data))
@@ -582,13 +631,22 @@ class KITTIEvaluation(object):
                     n_in_seq += 1
 
                 # check if uploaded data provides information for 2D and 3D evaluation
-                if not loading_groundtruth and eval_2d is True and (
-                        t_data.x1 == -1 or t_data.x2 == -1 or t_data.y1 == -1 or
-                        t_data.y2 == -1):
+                if (
+                    not loading_groundtruth
+                    and eval_2d is True
+                    and (
+                        t_data.x1 == -1
+                        or t_data.x2 == -1
+                        or t_data.y1 == -1
+                        or t_data.y2 == -1
+                    )
+                ):
                     eval_2d = False
-                if not loading_groundtruth and eval_3d is True and (
-                        t_data.X == -1000 or t_data.Y == -1000 or
-                        t_data.Z == -1000):
+                if (
+                    not loading_groundtruth
+                    and eval_3d is True
+                    and (t_data.X == -1000 or t_data.Y == -1000 or t_data.Z == -1000)
+                ):
                     eval_3d = False
 
             # only add existing frames
@@ -629,9 +687,9 @@ class KITTIEvaluation(object):
 
     def boxoverlap(self, a, b, criterion="union"):
         """
-            boxoverlap computes intersection over union for bbox a and b in KITTI format.
-            If the criterion is 'union', overlap = (a inter b) / a union b).
-            If the criterion is 'a', overlap = (a inter b) / a, where b should be a dontcare area.
+        boxoverlap computes intersection over union for bbox a and b in KITTI format.
+        If the criterion is 'union', overlap = (a inter b) / a union b).
+        If the criterion is 'a', overlap = (a inter b) / a, where b should be a dontcare area.
         """
         x1 = max(a.x1, b.x1)
         y1 = max(a.y1, b.y1)
@@ -641,8 +699,8 @@ class KITTIEvaluation(object):
         w = x2 - x1
         h = y2 - y1
 
-        if w <= 0. or h <= 0.:
-            return 0.
+        if w <= 0.0 or h <= 0.0:
+            return 0.0
         inter = w * h
         aarea = (a.x2 - a.x1) * (a.y2 - a.y1)
         barea = (b.x2 - b.x1) * (b.y2 - b.y1)
@@ -657,11 +715,11 @@ class KITTIEvaluation(object):
 
     def compute3rdPartyMetrics(self):
         """
-            Computes the metrics defined in
-                - Stiefelhagen 2008: Evaluating Multiple Object Tracking Performance: The CLEAR MOT Metrics
-                  MOTA, MOTAL, MOTP
-                - Nevatia 2008: Global Data Association for Multi-Object Tracking Using Network Flows
-                  MT/PT/ML
+        Computes the metrics defined in
+            - Stiefelhagen 2008: Evaluating Multiple Object Tracking Performance: The CLEAR MOT Metrics
+              MOTA, MOTAL, MOTP
+            - Nevatia 2008: Global Data Association for Multi-Object Tracking Using Network Flows
+              MT/PT/ML
         """
         # construct Munkres object for Hungarian Method association
         hm = Munkres()
@@ -740,7 +798,8 @@ class KITTIEvaluation(object):
                 tmpfn = 0
                 tmpc = 0  # this will sum up the overlaps for all true positives
                 tmpcs = [0] * len(
-                    g)  # this will save the overlaps for all true positives
+                    g
+                )  # this will save the overlaps for all true positives
                 # the reason is that some true positives might be ignored
                 # later such that the corrsponding overlaps can
                 # be subtracted from tmpc for MODP computation
@@ -782,10 +841,13 @@ class KITTIEvaluation(object):
                     # smaller or equal to the minimum height
 
                     tt_height = abs(tt.y1 - tt.y2)
-                    if ((self.cls == "car" and tt.obj_type == "van") or
-                        (self.cls == "pedestrian" and
-                         tt.obj_type == "person_sitting") or
-                            tt_height <= self.min_height) and not tt.valid:
+                    if (
+                        (self.cls == "car" and tt.obj_type == "van")
+                        or (
+                            self.cls == "pedestrian" and tt.obj_type == "person_sitting"
+                        )
+                        or tt_height <= self.min_height
+                    ) and not tt.valid:
                         nignoredtracker += 1
                         tt.ignored = True
                         ignoredtrackers[tt.track_id] = 1
@@ -808,16 +870,29 @@ class KITTIEvaluation(object):
                 gi = 0
                 for gg in g:
                     if gg.tracker < 0:
-                        if gg.occlusion>self.max_occlusion or gg.truncation>self.max_truncation\
-                                or (self.cls=="car" and gg.obj_type=="van") or (self.cls=="pedestrian" and gg.obj_type=="person_sitting"):
+                        if (
+                            gg.occlusion > self.max_occlusion
+                            or gg.truncation > self.max_truncation
+                            or (self.cls == "car" and gg.obj_type == "van")
+                            or (
+                                self.cls == "pedestrian"
+                                and gg.obj_type == "person_sitting"
+                            )
+                        ):
                             seq_ignored[gg.track_id][-1] = True
                             gg.ignored = True
                             ignoredfn += 1
 
                     elif gg.tracker >= 0:
-                        if gg.occlusion>self.max_occlusion or gg.truncation>self.max_truncation\
-                                or (self.cls=="car" and gg.obj_type=="van") or (self.cls=="pedestrian" and gg.obj_type=="person_sitting"):
-
+                        if (
+                            gg.occlusion > self.max_occlusion
+                            or gg.truncation > self.max_truncation
+                            or (self.cls == "car" and gg.obj_type == "van")
+                            or (
+                                self.cls == "pedestrian"
+                                and gg.obj_type == "person_sitting"
+                            )
+                        ):
                             seq_ignored[gg.track_id][-1] = True
                             gg.ignored = True
                             nignoredtp += 1
@@ -843,7 +918,7 @@ class KITTIEvaluation(object):
                 self.itp += nignoredtp
 
                 # adjust the number of ground truth objects considered
-                self.n_gt -= (ignoredfn + nignoredtp)
+                self.n_gt -= ignoredfn + nignoredtp
 
                 # count the number of ignored ground truth objects
                 self.n_igt += ignoredfn + nignoredtp
@@ -862,10 +937,8 @@ class KITTIEvaluation(object):
 
                 # false positives = tracker bboxes - associated tracker bboxes
                 # mismatches (mme_t)
-                tmpfp += len(
-                    t) - tmptp - nignoredtracker - nignoredtp + nignoredpairs
-                self.fp += len(
-                    t) - tmptp - nignoredtracker - nignoredtp + nignoredpairs
+                tmpfp += len(t) - tmptp - nignoredtracker - nignoredtp + nignoredpairs
+                self.fp += len(t) - tmptp - nignoredtracker - nignoredtp + nignoredpairs
 
                 # update sequence data
                 seqtp += tmptp
@@ -895,14 +968,14 @@ class KITTIEvaluation(object):
                     print(tmptp, nignoredtp)
                     raise NameError("Something went wrong! TP is negative")
                 if tmpfn < 0:
-                    print(tmpfn,
-                          len(g),
-                          len(association_matrix), ignoredfn, nignoredpairs)
+                    print(
+                        tmpfn, len(g), len(association_matrix), ignoredfn, nignoredpairs
+                    )
                     raise NameError("Something went wrong! FN is negative")
                 if tmpfp < 0:
-                    print(tmpfp,
-                          len(t), tmptp, nignoredtracker, nignoredtp,
-                          nignoredpairs)
+                    print(
+                        tmpfp, len(t), tmptp, nignoredtracker, nignoredtp, nignoredpairs
+                    )
                     raise NameError("Something went wrong! FP is negative")
                 if tmptp + tmpfn is not len(g) - ignoredfn - nignoredtp:
                     print("seqidx", seq_idx)
@@ -914,14 +987,14 @@ class KITTIEvaluation(object):
                     print("nAss  ", len(association_matrix))
                     print("ign GT", ignoredfn)
                     print("ign TP", nignoredtp)
-                    raise NameError(
-                        "Something went wrong! nGroundtruth is not TP+FN")
-                if tmptp + tmpfp + nignoredtp + nignoredtracker - nignoredpairs is not len(
-                        t):
+                    raise NameError("Something went wrong! nGroundtruth is not TP+FN")
+                if (
+                    tmptp + tmpfp + nignoredtp + nignoredtracker - nignoredpairs
+                    is not len(t)
+                ):
                     print(seq_idx, f, len(t), tmptp, tmpfp)
                     print(len(association_matrix), association_matrix)
-                    raise NameError(
-                        "Something went wrong! nTracker is not TP+FP")
+                    raise NameError("Something went wrong! nTracker is not TP+FP")
 
                 # check for id switches or fragmentations
                 for i, tt in enumerate(this_ids[0]):
@@ -963,15 +1036,14 @@ class KITTIEvaluation(object):
 
         # compute MT/PT/ML, fragments, idswitches for all groundtruth trajectories
         n_ignored_tr_total = 0
-        for seq_idx, (
-                seq_trajectories, seq_ignored
-        ) in enumerate(zip(self.gt_trajectories, self.ign_trajectories)):
+        for seq_idx, (seq_trajectories, seq_ignored) in enumerate(
+            zip(self.gt_trajectories, self.ign_trajectories)
+        ):
             if len(seq_trajectories) == 0:
                 continue
             tmpMT, tmpML, tmpPT, tmpId_switches, tmpFragments = [0] * 5
             n_ignored_tr = 0
-            for g, ign_g in zip(seq_trajectories.values(),
-                                seq_ignored.values()):
+            for g, ign_g in zip(seq_trajectories.values(), seq_ignored.values()):
                 # all frames of this gt trajectory are ignored
                 if all(ign_g):
                     n_ignored_tr += 1
@@ -992,21 +1064,34 @@ class KITTIEvaluation(object):
                         last_id = -1
                         continue
                     lgt += 1
-                    if last_id != g[f] and last_id != -1 and g[f] != -1 and g[
-                            f - 1] != -1:
+                    if (
+                        last_id != g[f]
+                        and last_id != -1
+                        and g[f] != -1
+                        and g[f - 1] != -1
+                    ):
                         tmpId_switches += 1
                         self.id_switches += 1
-                    if f < len(g) - 1 and g[f - 1] != g[
-                            f] and last_id != -1 and g[f] != -1 and g[f +
-                                                                      1] != -1:
+                    if (
+                        f < len(g) - 1
+                        and g[f - 1] != g[f]
+                        and last_id != -1
+                        and g[f] != -1
+                        and g[f + 1] != -1
+                    ):
                         tmpFragments += 1
                         self.fragments += 1
                     if g[f] != -1:
                         tracked += 1
                         last_id = g[f]
                 # handle last frame; tracked state is handled in for loop (g[f]!=-1)
-                if len(g) > 1 and g[f - 1] != g[f] and last_id != -1 and g[
-                        f] != -1 and not ign_g[f]:
+                if (
+                    len(g) > 1
+                    and g[f - 1] != g[f]
+                    and last_id != -1
+                    and g[f] != -1
+                    and not ign_g[f]
+                ):
                     tmpFragments += 1
                     self.fragments += 1
 
@@ -1023,9 +1108,9 @@ class KITTIEvaluation(object):
                     self.PT += 1
 
         if (self.n_gt_trajectories - n_ignored_tr_total) == 0:
-            self.MT = 0.
-            self.PT = 0.
-            self.ML = 0.
+            self.MT = 0.0
+            self.PT = 0.0
+            self.ML = 0.0
         else:
             self.MT /= float(self.n_gt_trajectories - n_ignored_tr_total)
             self.PT /= float(self.n_gt_trajectories - n_ignored_tr_total)
@@ -1033,16 +1118,17 @@ class KITTIEvaluation(object):
 
         # precision/recall etc.
         if (self.fp + self.tp) == 0 or (self.tp + self.fn) == 0:
-            self.recall = 0.
-            self.precision = 0.
+            self.recall = 0.0
+            self.precision = 0.0
         else:
             self.recall = self.tp / float(self.tp + self.fn)
             self.precision = self.tp / float(self.fp + self.tp)
         if (self.recall + self.precision) == 0:
-            self.F1 = 0.
+            self.F1 = 0.0
         else:
-            self.F1 = 2. * (self.precision * self.recall) / (
-                self.precision + self.recall)
+            self.F1 = (
+                2.0 * (self.precision * self.recall) / (self.precision + self.recall)
+            )
         if sum(self.n_frames) == 0:
             self.FAR = "n/a"
         else:
@@ -1053,8 +1139,7 @@ class KITTIEvaluation(object):
             self.MOTA = -float("inf")
             self.MODA = -float("inf")
         else:
-            self.MOTA = 1 - (self.fn + self.fp + self.id_switches
-                             ) / float(self.n_gt)
+            self.MOTA = 1 - (self.fn + self.fp + self.id_switches) / float(self.n_gt)
             self.MODA = 1 - (self.fn + self.fp) / float(self.n_gt)
         if self.tp == 0:
             self.MOTP = float("inf")
@@ -1062,12 +1147,13 @@ class KITTIEvaluation(object):
             self.MOTP = self.total_cost / float(self.tp)
         if self.n_gt != 0:
             if self.id_switches == 0:
-                self.MOTAL = 1 - (self.fn + self.fp + self.id_switches
-                                  ) / float(self.n_gt)
+                self.MOTAL = 1 - (self.fn + self.fp + self.id_switches) / float(
+                    self.n_gt
+                )
             else:
-                self.MOTAL = 1 - (self.fn + self.fp +
-                                  math.log10(self.id_switches)
-                                  ) / float(self.n_gt)
+                self.MOTAL = 1 - (
+                    self.fn + self.fp + math.log10(self.id_switches)
+                ) / float(self.n_gt)
         else:
             self.MOTAL = -float("inf")
         if sum(self.n_frames) == 0:
@@ -1079,16 +1165,26 @@ class KITTIEvaluation(object):
     def createSummary(self):
         summary = ""
         summary += "tracking evaluation summary".center(80, "=") + "\n"
-        summary += self.printEntry("Multiple Object Tracking Accuracy (MOTA)",
-                                   self.MOTA) + "\n"
-        summary += self.printEntry("Multiple Object Tracking Precision (MOTP)",
-                                   self.MOTP) + "\n"
-        summary += self.printEntry("Multiple Object Tracking Accuracy (MOTAL)",
-                                   self.MOTAL) + "\n"
-        summary += self.printEntry("Multiple Object Detection Accuracy (MODA)",
-                                   self.MODA) + "\n"
-        summary += self.printEntry("Multiple Object Detection Precision (MODP)",
-                                   self.MODP) + "\n"
+        summary += (
+            self.printEntry("Multiple Object Tracking Accuracy (MOTA)", self.MOTA)
+            + "\n"
+        )
+        summary += (
+            self.printEntry("Multiple Object Tracking Precision (MOTP)", self.MOTP)
+            + "\n"
+        )
+        summary += (
+            self.printEntry("Multiple Object Tracking Accuracy (MOTAL)", self.MOTAL)
+            + "\n"
+        )
+        summary += (
+            self.printEntry("Multiple Object Detection Accuracy (MODA)", self.MODA)
+            + "\n"
+        )
+        summary += (
+            self.printEntry("Multiple Object Detection Precision (MODP)", self.MODP)
+            + "\n"
+        )
         summary += "\n"
         summary += self.printEntry("Recall", self.recall) + "\n"
         summary += self.printEntry("Precision", self.precision) + "\n"
@@ -1100,53 +1196,55 @@ class KITTIEvaluation(object):
         summary += self.printEntry("Mostly Lost", self.ML) + "\n"
         summary += "\n"
         summary += self.printEntry("True Positives", self.tp) + "\n"
-        #summary += self.printEntry("True Positives per Sequence", self.tps) + "\n"
+        # summary += self.printEntry("True Positives per Sequence", self.tps) + "\n"
         summary += self.printEntry("Ignored True Positives", self.itp) + "\n"
-        #summary += self.printEntry("Ignored True Positives per Sequence", self.itps) + "\n"
+        # summary += self.printEntry("Ignored True Positives per Sequence", self.itps) + "\n"
 
         summary += self.printEntry("False Positives", self.fp) + "\n"
-        #summary += self.printEntry("False Positives per Sequence", self.fps) + "\n"
+        # summary += self.printEntry("False Positives per Sequence", self.fps) + "\n"
         summary += self.printEntry("False Negatives", self.fn) + "\n"
-        #summary += self.printEntry("False Negatives per Sequence", self.fns) + "\n"
+        # summary += self.printEntry("False Negatives per Sequence", self.fns) + "\n"
         summary += self.printEntry("ID-switches", self.id_switches) + "\n"
         self.fp = self.fp / self.n_gt
         self.fn = self.fn / self.n_gt
         self.id_switches = self.id_switches / self.n_gt
         summary += self.printEntry("False Positives Ratio", self.fp) + "\n"
-        #summary += self.printEntry("False Positives per Sequence", self.fps) + "\n"
+        # summary += self.printEntry("False Positives per Sequence", self.fps) + "\n"
         summary += self.printEntry("False Negatives Ratio", self.fn) + "\n"
-        #summary += self.printEntry("False Negatives per Sequence", self.fns) + "\n"
-        summary += self.printEntry("Ignored False Negatives Ratio",
-                                   self.ifn) + "\n"
+        # summary += self.printEntry("False Negatives per Sequence", self.fns) + "\n"
+        summary += self.printEntry("Ignored False Negatives Ratio", self.ifn) + "\n"
 
-        #summary += self.printEntry("Ignored False Negatives per Sequence", self.ifns) + "\n"
+        # summary += self.printEntry("Ignored False Negatives per Sequence", self.ifns) + "\n"
         summary += self.printEntry("Missed Targets", self.fn) + "\n"
         summary += self.printEntry("ID-switches", self.id_switches) + "\n"
         summary += self.printEntry("Fragmentations", self.fragments) + "\n"
         summary += "\n"
-        summary += self.printEntry("Ground Truth Objects (Total)", self.n_gt +
-                                   self.n_igt) + "\n"
-        #summary += self.printEntry("Ground Truth Objects (Total) per Sequence", self.n_gts) + "\n"
-        summary += self.printEntry("Ignored Ground Truth Objects",
-                                   self.n_igt) + "\n"
-        #summary += self.printEntry("Ignored Ground Truth Objects per Sequence", self.n_igts) + "\n"
-        summary += self.printEntry("Ground Truth Trajectories",
-                                   self.n_gt_trajectories) + "\n"
+        summary += (
+            self.printEntry("Ground Truth Objects (Total)", self.n_gt + self.n_igt)
+            + "\n"
+        )
+        # summary += self.printEntry("Ground Truth Objects (Total) per Sequence", self.n_gts) + "\n"
+        summary += self.printEntry("Ignored Ground Truth Objects", self.n_igt) + "\n"
+        # summary += self.printEntry("Ignored Ground Truth Objects per Sequence", self.n_igts) + "\n"
+        summary += (
+            self.printEntry("Ground Truth Trajectories", self.n_gt_trajectories) + "\n"
+        )
         summary += "\n"
         summary += self.printEntry("Tracker Objects (Total)", self.n_tr) + "\n"
-        #summary += self.printEntry("Tracker Objects (Total) per Sequence", self.n_trs) + "\n"
+        # summary += self.printEntry("Tracker Objects (Total) per Sequence", self.n_trs) + "\n"
         summary += self.printEntry("Ignored Tracker Objects", self.n_itr) + "\n"
-        #summary += self.printEntry("Ignored Tracker Objects per Sequence", self.n_itrs) + "\n"
-        summary += self.printEntry("Tracker Trajectories",
-                                   self.n_tr_trajectories) + "\n"
-        #summary += "\n"
-        #summary += self.printEntry("Ignored Tracker Objects with Associated Ignored Ground Truth Objects", self.n_igttr) + "\n"
+        # summary += self.printEntry("Ignored Tracker Objects per Sequence", self.n_itrs) + "\n"
+        summary += (
+            self.printEntry("Tracker Trajectories", self.n_tr_trajectories) + "\n"
+        )
+        # summary += "\n"
+        # summary += self.printEntry("Ignored Tracker Objects with Associated Ignored Ground Truth Objects", self.n_igttr) + "\n"
         summary += "=" * 80
         return summary
 
     def printEntry(self, key, val, width=(70, 10)):
         """
-            Pretty print an entry in a table fashion.
+        Pretty print an entry in a table fashion.
         """
         s_out = key.ljust(width[0])
         if type(val) == int:
@@ -1161,12 +1259,11 @@ class KITTIEvaluation(object):
 
     def saveToStats(self, save_summary):
         """
-            Save the statistics in a whitespace separate file.
+        Save the statistics in a whitespace separate file.
         """
         summary = self.createSummary()
         if save_summary:
-            filename = os.path.join(self.result_path,
-                                    "summary_%s.txt" % self.cls)
+            filename = os.path.join(self.result_path, "summary_%s.txt" % self.cls)
             dump = open(filename, "w+")
             dump.write(summary)
             dump.close()
@@ -1184,13 +1281,13 @@ class KITTIMOTMetric(Metric):
         self.seqs = []
         self.n_sequences = 0
         self.n_frames = []
-        self.strsummary = ''
+        self.strsummary = ""
 
     def update(self, data_root, seq, data_type, result_root, result_filename):
-        assert data_type == 'kitti', "data_type should 'kitti'"
+        assert data_type == "kitti", "data_type should 'kitti'"
         self.result_root = result_root
         self.gt_path = data_root
-        gt_path = '{}/../labels/{}.txt'.format(data_root, seq)
+        gt_path = "{}/../labels/{}.txt".format(data_root, seq)
         gt = open(gt_path, "r")
         max_frame = 0
         for line in gt:
@@ -1212,8 +1309,13 @@ class KITTIMOTMetric(Metric):
 
     def accumulate(self):
         logger.info("Processing Result for KITTI Tracking Benchmark")
-        e = self.MOTEvaluator(result_path=self.result_root, gt_path=self.gt_path,\
-            n_frames=self.n_frames, seqs=self.seqs, n_sequences=self.n_sequences)
+        e = self.MOTEvaluator(
+            result_path=self.result_root,
+            gt_path=self.gt_path,
+            n_frames=self.n_frames,
+            seqs=self.seqs,
+            n_sequences=self.n_sequences,
+        )
         try:
             if not e.loadTracker():
                 return
@@ -1227,7 +1329,8 @@ class KITTIMOTMetric(Metric):
         # sanity checks
         if len(e.groundtruth) is not len(e.tracker):
             logger.info(
-                "The uploaded data does not provide results for every sequence.")
+                "The uploaded data does not provide results for every sequence."
+            )
             return False
         logger.info("Loaded %d Sequences." % len(e.groundtruth))
         logger.info("Start Evaluation...")

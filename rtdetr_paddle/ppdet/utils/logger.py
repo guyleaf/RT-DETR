@@ -18,7 +18,7 @@ import sys
 
 import paddle.distributed as dist
 
-__all__ = ['setup_logger']
+__all__ = ["setup_logger"]
 
 logger_initialized = []
 
@@ -43,8 +43,8 @@ def setup_logger(name="ppdet", output=None):
     logger.propagate = False
 
     formatter = logging.Formatter(
-        "[%(asctime)s] %(name)s %(levelname)s: %(message)s",
-        datefmt="%m/%d %H:%M:%S")
+        "[%(asctime)s] %(name)s %(levelname)s: %(message)s", datefmt="%m/%d %H:%M:%S"
+    )
     # stdout logging: master only
     local_rank = dist.get_rank()
     if local_rank == 0:
@@ -62,7 +62,7 @@ def setup_logger(name="ppdet", output=None):
         if local_rank > 0:
             filename = filename + ".rank{}".format(local_rank)
         os.makedirs(os.path.dirname(filename))
-        fh = logging.FileHandler(filename, mode='a')
+        fh = logging.FileHandler(filename, mode="a")
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(logging.Formatter())
         logger.addHandler(fh)

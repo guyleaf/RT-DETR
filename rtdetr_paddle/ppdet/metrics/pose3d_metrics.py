@@ -1,27 +1,30 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved. 
-#   
-# Licensed under the Apache License, Version 2.0 (the "License");   
-# you may not use this file except in compliance with the License.  
-# You may obtain a copy of the License at   
-#   
-#     http://www.apache.org/licenses/LICENSE-2.0    
-#   
-# Unless required by applicable law or agreed to in writing, software   
-# distributed under the License is distributed on an "AS IS" BASIS, 
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  
-# See the License for the specific language governing permissions and   
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
+from collections import OrderedDict, defaultdict
+
+import numpy as np
 import paddle
 from paddle.distributed import ParallelEnv
-import os
-import json
-from collections import defaultdict, OrderedDict
-import numpy as np
+
 from ppdet.utils.logger import setup_logger
+
 logger = setup_logger(__name__)
 
-__all__ = ['Pose3DEval']
+__all__ = ["Pose3DEval"]
 
 
 class AverageMeter(object):
@@ -42,7 +45,7 @@ class AverageMeter(object):
 
 
 def mean_per_joint_position_error(pred, gt, has_3d_joints):
-    """ 
+    """
     Compute mPJPE
     """
     gt = gt[has_3d_joints == 1]
@@ -54,7 +57,7 @@ def mean_per_joint_position_error(pred, gt, has_3d_joints):
         gt = gt - gt_pelvis[:, None, :]
         pred_pelvis = (pred[:, 2, :] + pred[:, 3, :]) / 2
         pred = pred - pred_pelvis[:, None, :]
-        error = paddle.sqrt(((pred - gt)**2).sum(axis=-1)).mean(axis=-1).numpy()
+        error = paddle.sqrt(((pred - gt) ** 2).sum(axis=-1)).mean(axis=-1).numpy()
         return error
 
 
@@ -69,7 +72,7 @@ def compute_similarity_transform(S1, S2):
         S1 = S1.T
         S2 = S2.T
         transposed = True
-    assert (S2.shape[1] == S1.shape[1])
+    assert S2.shape[1] == S1.shape[1]
 
     # 1. Remove mean.
     mu1 = S1.mean(axis=1, keepdims=True)
@@ -116,13 +119,13 @@ def compute_similarity_transform_batch(S1, S2):
     return S1_hat
 
 
-def reconstruction_error(S1, S2, reduction='mean'):
+def reconstruction_error(S1, S2, reduction="mean"):
     """Do Procrustes alignment and compute reconstruction error."""
     S1_hat = compute_similarity_transform_batch(S1, S2)
-    re = np.sqrt(((S1_hat - S2)**2).sum(axis=-1)).mean(axis=-1)
-    if reduction == 'mean':
+    re = np.sqrt(((S1_hat - S2) ** 2).sum(axis=-1)).mean(axis=-1)
+    if reduction == "mean":
         re = re.mean()
-    elif reduction == 'sum':
+    elif reduction == "sum":
         re = re.sum()
     return re
 
@@ -150,51 +153,55 @@ class Pose3DEval(object):
         self.eval_results = {}
 
     def get_human36m_joints(self, input):
-        J24_TO_J14 = paddle.to_tensor(
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18])
+        J24_TO_J14 = paddle.to_tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18])
         J24_TO_J17 = paddle.to_tensor(
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 18, 19])
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 18, 19]
+        )
         return paddle.index_select(input, J24_TO_J14, axis=1)
 
     def update(self, inputs, outputs):
-        gt_3d_joints = all_gather(inputs['joints_3d'].cuda(ParallelEnv()
-                                                           .local_rank))
-        has_3d_joints = all_gather(inputs['has_3d_joints'].cuda(ParallelEnv()
-                                                                .local_rank))
-        pred_3d_joints = all_gather(outputs['pose3d'])
+        gt_3d_joints = all_gather(inputs["joints_3d"].cuda(ParallelEnv().local_rank))
+        has_3d_joints = all_gather(
+            inputs["has_3d_joints"].cuda(ParallelEnv().local_rank)
+        )
+        pred_3d_joints = all_gather(outputs["pose3d"])
         if gt_3d_joints.shape[1] == 24:
             gt_3d_joints = self.get_human36m_joints(gt_3d_joints)
         if pred_3d_joints.shape[1] == 24:
             pred_3d_joints = self.get_human36m_joints(pred_3d_joints)
-        mPJPE_val = mean_per_joint_position_error(pred_3d_joints, gt_3d_joints,
-                                                  has_3d_joints).mean()
+        mPJPE_val = mean_per_joint_position_error(
+            pred_3d_joints, gt_3d_joints, has_3d_joints
+        ).mean()
         PAmPJPE_val = reconstruction_error(
-            pred_3d_joints.numpy(),
-            gt_3d_joints[:, :, :3].numpy(),
-            reduction=None).mean()
+            pred_3d_joints.numpy(), gt_3d_joints[:, :, :3].numpy(), reduction=None
+        ).mean()
         count = int(np.sum(has_3d_joints.numpy()))
-        self.PAmPJPE.update(PAmPJPE_val * 1000., count)
-        self.mPJPE.update(mPJPE_val * 1000., count)
+        self.PAmPJPE.update(PAmPJPE_val * 1000.0, count)
+        self.mPJPE.update(mPJPE_val * 1000.0, count)
 
     def accumulate(self):
         if self.save_prediction_only:
-            logger.info(f'The pose3d result is saved to {self.res_file} '
-                        'and do not evaluate the model.')
+            logger.info(
+                f"The pose3d result is saved to {self.res_file} "
+                "and do not evaluate the model."
+            )
             return
-        self.eval_results['pose3d'] = [-self.mPJPE.avg, -self.PAmPJPE.avg]
+        self.eval_results["pose3d"] = [-self.mPJPE.avg, -self.PAmPJPE.avg]
 
     def log(self):
         if self.save_prediction_only:
             return
-        stats_names = ['mPJPE', 'PAmPJPE']
+        stats_names = ["mPJPE", "PAmPJPE"]
         num_values = len(stats_names)
-        print(' '.join(['| {}'.format(name) for name in stats_names]) + ' |')
-        print('|---' * (num_values + 1) + '|')
+        print(" ".join(["| {}".format(name) for name in stats_names]) + " |")
+        print("|---" * (num_values + 1) + "|")
 
-        print(' '.join([
-            '| {:.3f}'.format(abs(value))
-            for value in self.eval_results['pose3d']
-        ]) + ' |')
+        print(
+            " ".join(
+                ["| {:.3f}".format(abs(value)) for value in self.eval_results["pose3d"]]
+            )
+            + " |"
+        )
 
     def get_results(self):
         return self.eval_results

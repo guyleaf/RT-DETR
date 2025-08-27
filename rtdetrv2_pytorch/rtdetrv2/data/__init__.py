@@ -1,17 +1,13 @@
-"""Copyright(c) 2023 lyuwenyu. All Rights Reserved.
-"""
-
-from .dataset import *
-from .transforms import *
-from .dataloader import *
+"""Copyright(c) 2023 lyuwenyu. All Rights Reserved."""
 
 from ._misc import convert_to_tv_tensor
-
-
+from .dataloader import *
+from .dataset import *
+from .transforms import *
 
 
 # def set_epoch(self, epoch) -> None:
-#     self.epoch = epoch 
+#     self.epoch = epoch
 # def _set_epoch_func(datasets):
 #     """Add `set_epoch` for datasets
 #     """

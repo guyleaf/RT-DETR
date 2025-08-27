@@ -12,27 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
+
+from numbers import Integral
 
 import paddle
 import paddle.nn as nn
 from paddle import ParamAttr
 from paddle.nn import AdaptiveAvgPool2D, Conv2D
-from paddle.regularizer import L2Decay
 from paddle.nn.initializer import KaimingNormal
+from paddle.regularizer import L2Decay
 
 from ppdet.core.workspace import register, serializable
-from numbers import Integral
+
 from ..shape_spec import ShapeSpec
 
-__all__ = ['LCNet']
+__all__ = ["LCNet"]
 
 NET_CONFIG = {
     "blocks2":
-    #k, in_c, out_c, s, use_se
-    [[3, 16, 32, 1, False], ],
+    # k, in_c, out_c, s, use_se
+    [
+        [3, 16, 32, 1, False],
+    ],
     "blocks3": [
         [3, 32, 64, 2, False],
         [3, 64, 64, 1, False],
@@ -49,7 +51,7 @@ NET_CONFIG = {
         [5, 256, 256, 1, False],
         [5, 256, 256, 1, False],
     ],
-    "blocks6": [[5, 256, 512, 2, True], [5, 512, 512, 1, True]]
+    "blocks6": [[5, 256, 512, 2, True], [5, 512, 512, 1, True]],
 }
 
 
@@ -63,13 +65,15 @@ def make_divisible(v, divisor=8, min_value=None):
 
 
 class ConvBNLayer(nn.Layer):
-    def __init__(self,
-                 num_channels,
-                 filter_size,
-                 num_filters,
-                 stride,
-                 num_groups=1,
-                 act='hard_swish'):
+    def __init__(
+        self,
+        num_channels,
+        filter_size,
+        num_filters,
+        stride,
+        num_groups=1,
+        act="hard_swish",
+    ):
         super().__init__()
 
         self.conv = Conv2D(
@@ -80,15 +84,17 @@ class ConvBNLayer(nn.Layer):
             padding=(filter_size - 1) // 2,
             groups=num_groups,
             weight_attr=ParamAttr(initializer=KaimingNormal()),
-            bias_attr=False)
+            bias_attr=False,
+        )
 
         self.bn = nn.BatchNorm2D(
             num_filters,
             weight_attr=ParamAttr(regularizer=L2Decay(0.0)),
-            bias_attr=ParamAttr(regularizer=L2Decay(0.0)))
-        if act == 'hard_swish':
+            bias_attr=ParamAttr(regularizer=L2Decay(0.0)),
+        )
+        if act == "hard_swish":
             self.act = nn.Hardswish()
-        elif act == 'relu6':
+        elif act == "relu6":
             self.act = nn.ReLU6()
 
     def forward(self, x):
@@ -99,13 +105,15 @@ class ConvBNLayer(nn.Layer):
 
 
 class DepthwiseSeparable(nn.Layer):
-    def __init__(self,
-                 num_channels,
-                 num_filters,
-                 stride,
-                 dw_size=3,
-                 use_se=False,
-                 act='hard_swish'):
+    def __init__(
+        self,
+        num_channels,
+        num_filters,
+        stride,
+        dw_size=3,
+        use_se=False,
+        act="hard_swish",
+    ):
         super().__init__()
         self.use_se = use_se
         self.dw_conv = ConvBNLayer(
@@ -114,7 +122,8 @@ class DepthwiseSeparable(nn.Layer):
             filter_size=dw_size,
             stride=stride,
             num_groups=num_channels,
-            act=act)
+            act=act,
+        )
         if use_se:
             self.se = SEModule(num_channels)
         self.pw_conv = ConvBNLayer(
@@ -122,7 +131,8 @@ class DepthwiseSeparable(nn.Layer):
             filter_size=1,
             num_filters=num_filters,
             stride=1,
-            act=act)
+            act=act,
+        )
 
     def forward(self, x):
         x = self.dw_conv(x)
@@ -141,14 +151,16 @@ class SEModule(nn.Layer):
             out_channels=channel // reduction,
             kernel_size=1,
             stride=1,
-            padding=0)
+            padding=0,
+        )
         self.relu = nn.ReLU()
         self.conv2 = Conv2D(
             in_channels=channel // reduction,
             out_channels=channel,
             kernel_size=1,
             stride=1,
-            padding=0)
+            padding=0,
+        )
         self.hardsigmoid = nn.Hardsigmoid()
 
     def forward(self, x):
@@ -165,7 +177,7 @@ class SEModule(nn.Layer):
 @register
 @serializable
 class LCNet(nn.Layer):
-    def __init__(self, scale=1.0, feature_maps=[3, 4, 5], act='hard_swish'):
+    def __init__(self, scale=1.0, feature_maps=[3, 4, 5], act="hard_swish"):
         super().__init__()
         self.scale = scale
         self.feature_maps = feature_maps
@@ -177,80 +189,92 @@ class LCNet(nn.Layer):
             filter_size=3,
             num_filters=make_divisible(16 * scale),
             stride=2,
-            act=act)
+            act=act,
+        )
 
-        self.blocks2 = nn.Sequential(* [
-            DepthwiseSeparable(
-                num_channels=make_divisible(in_c * scale),
-                num_filters=make_divisible(out_c * scale),
-                dw_size=k,
-                stride=s,
-                use_se=se,
-                act=act)
-            for i, (k, in_c, out_c, s, se) in enumerate(NET_CONFIG["blocks2"])
-        ])
+        self.blocks2 = nn.Sequential(
+            *[
+                DepthwiseSeparable(
+                    num_channels=make_divisible(in_c * scale),
+                    num_filters=make_divisible(out_c * scale),
+                    dw_size=k,
+                    stride=s,
+                    use_se=se,
+                    act=act,
+                )
+                for i, (k, in_c, out_c, s, se) in enumerate(NET_CONFIG["blocks2"])
+            ]
+        )
 
-        self.blocks3 = nn.Sequential(* [
-            DepthwiseSeparable(
-                num_channels=make_divisible(in_c * scale),
-                num_filters=make_divisible(out_c * scale),
-                dw_size=k,
-                stride=s,
-                use_se=se,
-                act=act)
-            for i, (k, in_c, out_c, s, se) in enumerate(NET_CONFIG["blocks3"])
-        ])
+        self.blocks3 = nn.Sequential(
+            *[
+                DepthwiseSeparable(
+                    num_channels=make_divisible(in_c * scale),
+                    num_filters=make_divisible(out_c * scale),
+                    dw_size=k,
+                    stride=s,
+                    use_se=se,
+                    act=act,
+                )
+                for i, (k, in_c, out_c, s, se) in enumerate(NET_CONFIG["blocks3"])
+            ]
+        )
 
-        out_channels.append(
-            make_divisible(NET_CONFIG["blocks3"][-1][2] * scale))
+        out_channels.append(make_divisible(NET_CONFIG["blocks3"][-1][2] * scale))
 
-        self.blocks4 = nn.Sequential(* [
-            DepthwiseSeparable(
-                num_channels=make_divisible(in_c * scale),
-                num_filters=make_divisible(out_c * scale),
-                dw_size=k,
-                stride=s,
-                use_se=se,
-                act=act)
-            for i, (k, in_c, out_c, s, se) in enumerate(NET_CONFIG["blocks4"])
-        ])
+        self.blocks4 = nn.Sequential(
+            *[
+                DepthwiseSeparable(
+                    num_channels=make_divisible(in_c * scale),
+                    num_filters=make_divisible(out_c * scale),
+                    dw_size=k,
+                    stride=s,
+                    use_se=se,
+                    act=act,
+                )
+                for i, (k, in_c, out_c, s, se) in enumerate(NET_CONFIG["blocks4"])
+            ]
+        )
 
-        out_channels.append(
-            make_divisible(NET_CONFIG["blocks4"][-1][2] * scale))
+        out_channels.append(make_divisible(NET_CONFIG["blocks4"][-1][2] * scale))
 
-        self.blocks5 = nn.Sequential(* [
-            DepthwiseSeparable(
-                num_channels=make_divisible(in_c * scale),
-                num_filters=make_divisible(out_c * scale),
-                dw_size=k,
-                stride=s,
-                use_se=se,
-                act=act)
-            for i, (k, in_c, out_c, s, se) in enumerate(NET_CONFIG["blocks5"])
-        ])
+        self.blocks5 = nn.Sequential(
+            *[
+                DepthwiseSeparable(
+                    num_channels=make_divisible(in_c * scale),
+                    num_filters=make_divisible(out_c * scale),
+                    dw_size=k,
+                    stride=s,
+                    use_se=se,
+                    act=act,
+                )
+                for i, (k, in_c, out_c, s, se) in enumerate(NET_CONFIG["blocks5"])
+            ]
+        )
 
-        out_channels.append(
-            make_divisible(NET_CONFIG["blocks5"][-1][2] * scale))
+        out_channels.append(make_divisible(NET_CONFIG["blocks5"][-1][2] * scale))
 
-        self.blocks6 = nn.Sequential(* [
-            DepthwiseSeparable(
-                num_channels=make_divisible(in_c * scale),
-                num_filters=make_divisible(out_c * scale),
-                dw_size=k,
-                stride=s,
-                use_se=se,
-                act=act)
-            for i, (k, in_c, out_c, s, se) in enumerate(NET_CONFIG["blocks6"])
-        ])
+        self.blocks6 = nn.Sequential(
+            *[
+                DepthwiseSeparable(
+                    num_channels=make_divisible(in_c * scale),
+                    num_filters=make_divisible(out_c * scale),
+                    dw_size=k,
+                    stride=s,
+                    use_se=se,
+                    act=act,
+                )
+                for i, (k, in_c, out_c, s, se) in enumerate(NET_CONFIG["blocks6"])
+            ]
+        )
 
-        out_channels.append(
-            make_divisible(NET_CONFIG["blocks6"][-1][2] * scale))
+        out_channels.append(make_divisible(NET_CONFIG["blocks6"][-1][2] * scale))
         self._out_channels = [
             ch for idx, ch in enumerate(out_channels) if idx + 2 in feature_maps
         ]
 
     def forward(self, inputs):
-        x = inputs['image']
+        x = inputs["image"]
         outs = []
 
         x = self.conv1(x)
