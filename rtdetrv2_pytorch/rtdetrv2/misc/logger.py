@@ -13,7 +13,7 @@ from typing import Dict
 import torch
 import torch.distributed as tdist
 
-from .dist_utils import get_world_size, is_dist_available_and_initialized
+from .dist_utils import barrier, get_world_size, is_dist_available_and_initialized
 
 
 class SmoothedValue(object):
@@ -41,7 +41,7 @@ class SmoothedValue(object):
         if not is_dist_available_and_initialized():
             return
         t = torch.tensor([self.count, self.total], dtype=torch.float64, device="cuda")
-        tdist.barrier()
+        barrier()
         tdist.all_reduce(t)
         t = t.tolist()
         self.count = int(t[0])
