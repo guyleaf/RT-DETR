@@ -128,7 +128,12 @@ def barrier():
     """
     if not is_dist_available_and_initialized():
         return
-    tdist.barrier()
+    if tdist.get_backend() == tdist.Backend.NCCL:
+        # This argument is needed to avoid warnings.
+        # It's valid only for NCCL backend.
+        tdist.barrier(device_ids=[torch.cuda.current_device()])
+    else:
+        tdist.barrier()
 
 
 def save_on_master(*args, **kwargs):
