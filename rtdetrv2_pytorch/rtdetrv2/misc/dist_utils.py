@@ -42,10 +42,15 @@ def setup_distributed(
         LOCAL_RANK = int(os.getenv("LOCAL_RANK", -1))
         WORLD_SIZE = int(os.getenv("WORLD_SIZE", 1))
 
-        tdist.init_process_group(init_method="env://")
+        has_gpu = torch.cuda.is_available()
+        tdist.init_process_group(
+            backend=tdist.Backend.NCCL if has_gpu else tdist.Backend.GLOO,
+            init_method="env://",
+        )
 
-        torch.cuda.set_device(get_rank())
-        torch.cuda.empty_cache()
+        if has_gpu:
+            torch.cuda.set_device(get_rank())
+            torch.cuda.empty_cache()
 
         enabled_dist = True
         print("Initialized distributed mode...")
