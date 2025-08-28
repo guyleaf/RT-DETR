@@ -1,5 +1,7 @@
 """Copyright(c) 2023 lyuwenyu. All Rights Reserved."""
 
+from typing import Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,7 +23,6 @@ class RTDETRPostProcessor(nn.Module):
         "num_classes",
         "use_focal_loss",
         "num_top_queries",
-        "remap_mscoco_category",
     ]
 
     def __init__(
@@ -29,20 +30,23 @@ class RTDETRPostProcessor(nn.Module):
         num_classes=80,
         use_focal_loss=True,
         num_top_queries=300,
-        remap_mscoco_category=False,
     ) -> None:
         super().__init__()
         self.use_focal_loss = use_focal_loss
         self.num_top_queries = num_top_queries
         self.num_classes = int(num_classes)
-        self.remap_mscoco_category = remap_mscoco_category
         self.deploy_mode = False
 
     def extra_repr(self) -> str:
         return f"use_focal_loss={self.use_focal_loss}, num_classes={self.num_classes}, num_top_queries={self.num_top_queries}"
 
     # def forward(self, outputs, orig_target_sizes):
-    def forward(self, outputs, orig_target_sizes: torch.Tensor):
+    def forward(
+        self,
+        outputs,
+        orig_target_sizes: torch.Tensor,
+        label2category: Optional[dict[int, int]] = None,
+    ):
         logits, boxes = outputs["pred_logits"], outputs["pred_boxes"]
         # orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
 
@@ -75,13 +79,10 @@ class RTDETRPostProcessor(nn.Module):
             return labels, boxes, scores
 
         # TODO
-        if self.remap_mscoco_category:
-            from ...data.dataset import mscoco_label2category
-
+        if label2category is not None:
+            # from ...data.dataset import mscoco_label2category
             labels = (
-                torch.tensor(
-                    [mscoco_label2category[int(x.item())] for x in labels.flatten()]
-                )
+                torch.tensor([label2category[int(x.item())] for x in labels.flatten()])
                 .to(boxes.device)
                 .reshape(labels.shape)
             )

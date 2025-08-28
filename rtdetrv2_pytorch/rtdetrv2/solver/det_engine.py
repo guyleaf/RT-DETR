@@ -15,6 +15,7 @@ from torch.cuda.amp.grad_scaler import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 
 from ..data import CocoEvaluator
+from ..data.dataset._dataset import DetDataset
 from ..misc import MetricLogger, SmoothedValue, dist_utils
 from ..optim import ModelEMA, Warmup
 
@@ -116,8 +117,8 @@ def train_one_epoch(
 def evaluate(
     model: torch.nn.Module,
     criterion: torch.nn.Module,
-    postprocessor,
-    data_loader,
+    postprocessor: torch.nn.Module,
+    data_loader: torch.utils.data.DataLoader,
     coco_evaluator: CocoEvaluator,
     device,
 ):
@@ -129,6 +130,9 @@ def evaluate(
     metric_logger = MetricLogger(delimiter="  ")
     header = "Test:"
 
+    dataset: DetDataset = data_loader.dataset
+    assert isinstance(dataset, DetDataset)
+    label2category = dataset.label2category
     for samples, targets in metric_logger.log_every(data_loader, 10, header):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
@@ -138,7 +142,9 @@ def evaluate(
         # TODO (lyuwenyu), fix dataset converted using `convert_to_coco_api`?
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
 
-        results = postprocessor(outputs, orig_target_sizes)
+        results = postprocessor(
+            outputs, orig_target_sizes, label2category=label2category
+        )
 
         # if 'segm' in postprocessor.keys():
         #     target_sizes = torch.stack([t["size"] for t in targets], dim=0)

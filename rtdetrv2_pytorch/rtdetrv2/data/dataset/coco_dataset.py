@@ -5,6 +5,8 @@ Mostly copy-paste from https://github.com/pytorch/vision/blob/13b35ff/references
 Copyright(c) 2023 lyuwenyu. All Rights Reserved.
 """
 
+from operator import itemgetter
+
 import torch
 import torchvision
 from faster_coco_eval.core import mask as coco_mask
@@ -54,13 +56,7 @@ class CocoDetection(FasterCocoDetection, DetDataset):
         image_id = self.ids[idx]
         target = {"image_id": image_id, "annotations": target}
 
-        if self.remap_mscoco_category:
-            image, target = self.prepare(
-                image, target, category2label=mscoco_category2label
-            )
-            # image, target = self.prepare(image, target, category2label=self.category2label)
-        else:
-            image, target = self.prepare(image, target)
+        image, target = self.prepare(image, target, category2label=self.category2label)
 
         target["idx"] = torch.tensor([idx])
 
@@ -87,25 +83,34 @@ class CocoDetection(FasterCocoDetection, DetDataset):
     def categories(
         self,
     ):
-        return self.coco.dataset["categories"]
+        return sorted(self.coco.dataset["categories"], key=itemgetter("id"))
 
     @property
     def category2name(
         self,
     ):
-        return {cat["id"]: cat["name"] for cat in self.categories}
+        if self.remap_mscoco_category:
+            return mscoco_category2name
+        else:
+            return {cat["id"]: cat["name"] for cat in self.categories}
 
     @property
     def category2label(
         self,
     ):
-        return {cat["id"]: i for i, cat in enumerate(self.categories)}
+        if self.remap_mscoco_category:
+            return mscoco_category2label
+        else:
+            return {cat["id"]: i for i, cat in enumerate(self.categories)}
 
     @property
     def label2category(
         self,
     ):
-        return {i: cat["id"] for i, cat in enumerate(self.categories)}
+        if self.remap_mscoco_category:
+            return mscoco_label2category
+        else:
+            return {i: cat["id"] for i, cat in enumerate(self.categories)}
 
 
 def convert_coco_poly_to_mask(segmentations, height, width):
