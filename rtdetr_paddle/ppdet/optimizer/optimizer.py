@@ -12,24 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
-import sys
+import copy
 import math
+import sys
+
 import paddle
 import paddle.nn as nn
-
 import paddle.optimizer as optimizer
 import paddle.regularizer as regularizer
 
 from ppdet.core.workspace import register, serializable
-import copy
 
-__all__ = ['LearningRate', 'OptimizerBuilder']
+__all__ = ["LearningRate", "OptimizerBuilder"]
 
 from ppdet.utils.logger import setup_logger
+
 logger = setup_logger(__name__)
 
 
@@ -48,21 +47,15 @@ class CosineDecay(object):
             the last few epochs. Default: 0.
     """
 
-    def __init__(self,
-                 max_epochs=1000,
-                 use_warmup=True,
-                 min_lr_ratio=0.,
-                 last_plateau_epochs=0):
+    def __init__(
+        self, max_epochs=1000, use_warmup=True, min_lr_ratio=0.0, last_plateau_epochs=0
+    ):
         self.max_epochs = max_epochs
         self.use_warmup = use_warmup
         self.min_lr_ratio = min_lr_ratio
         self.last_plateau_epochs = last_plateau_epochs
 
-    def __call__(self,
-                 base_lr=None,
-                 boundary=None,
-                 value=None,
-                 step_per_epoch=None):
+    def __call__(self, base_lr=None, boundary=None, value=None, step_per_epoch=None):
         assert base_lr is not None, "either base LR or values should be provided"
 
         max_iters = self.max_epochs * int(step_per_epoch)
@@ -74,9 +67,14 @@ class CosineDecay(object):
             for i in range(int(boundary[-1]), max_iters):
                 boundary.append(i)
                 if i < max_iters - last_plateau_iters:
-                    decayed_lr = min_lr + (base_lr - min_lr) * 0.5 * (math.cos(
-                        (i - warmup_iters) * math.pi /
-                        (max_iters - warmup_iters - last_plateau_iters)) + 1)
+                    decayed_lr = min_lr + (base_lr - min_lr) * 0.5 * (
+                        math.cos(
+                            (i - warmup_iters)
+                            * math.pi
+                            / (max_iters - warmup_iters - last_plateau_iters)
+                        )
+                        + 1
+                    )
                     value.append(decayed_lr)
                 else:
                     value.append(min_lr)
@@ -87,8 +85,9 @@ class CosineDecay(object):
             value = []
             for i in range(max_iters):
                 if i < max_iters - last_plateau_iters:
-                    decayed_lr = min_lr + (base_lr - min_lr) * 0.5 * (math.cos(
-                        i * math.pi / (max_iters - last_plateau_iters)) + 1)
+                    decayed_lr = min_lr + (base_lr - min_lr) * 0.5 * (
+                        math.cos(i * math.pi / (max_iters - last_plateau_iters)) + 1
+                    )
                     value.append(decayed_lr)
                 else:
                     value.append(min_lr)
@@ -97,7 +96,8 @@ class CosineDecay(object):
             return optimizer.lr.PiecewiseDecay(boundary, value)
 
         return optimizer.lr.CosineAnnealingDecay(
-            base_lr, T_max=max_iters, eta_min=min_lr)
+            base_lr, T_max=max_iters, eta_min=min_lr
+        )
 
 
 @serializable
@@ -110,11 +110,9 @@ class PiecewiseDecay(object):
         milestones (list): steps at which to decay learning rate
     """
 
-    def __init__(self,
-                 gamma=[0.1, 0.01],
-                 milestones=[8, 11],
-                 values=None,
-                 use_warmup=True):
+    def __init__(
+        self, gamma=[0.1, 0.01], milestones=[8, 11], values=None, use_warmup=True
+    ):
         super(PiecewiseDecay, self).__init__()
         if type(gamma) is not list:
             self.gamma = []
@@ -126,11 +124,7 @@ class PiecewiseDecay(object):
         self.values = values
         self.use_warmup = use_warmup
 
-    def __call__(self,
-                 base_lr=None,
-                 boundary=None,
-                 value=None,
-                 step_per_epoch=None):
+    def __call__(self, base_lr=None, boundary=None, value=None, step_per_epoch=None):
         if boundary is not None and self.use_warmup:
             boundary.extend([int(step_per_epoch) * i for i in self.milestones])
         else:
@@ -163,7 +157,7 @@ class LinearWarmup(object):
             of `epochs` is higher than `steps`. Default: None.
     """
 
-    def __init__(self, steps=500, start_factor=1. / 3, epochs=None):
+    def __init__(self, steps=500, start_factor=1.0 / 3, epochs=None):
         super(LinearWarmup, self).__init__()
         self.steps = steps
         self.start_factor = start_factor
@@ -172,8 +166,9 @@ class LinearWarmup(object):
     def __call__(self, base_lr, step_per_epoch):
         boundary = []
         value = []
-        warmup_steps = self.epochs * step_per_epoch \
-            if self.epochs is not None else self.steps
+        warmup_steps = (
+            self.epochs * step_per_epoch if self.epochs is not None else self.steps
+        )
         warmup_steps = max(warmup_steps, 1)
         for i in range(warmup_steps + 1):
             if warmup_steps > 0:
@@ -206,10 +201,12 @@ class ExpWarmup(object):
     def __call__(self, base_lr, step_per_epoch):
         boundary = []
         value = []
-        warmup_steps = self.epochs * step_per_epoch if self.epochs is not None else self.steps
+        warmup_steps = (
+            self.epochs * step_per_epoch if self.epochs is not None else self.steps
+        )
         warmup_steps = max(warmup_steps, 1)
         for i in range(warmup_steps + 1):
-            factor = (i / float(warmup_steps))**self.power
+            factor = (i / float(warmup_steps)) ** self.power
             value.append(base_lr * factor)
             if i > 0:
                 boundary.append(i)
@@ -225,11 +222,10 @@ class LearningRate(object):
         base_lr (float): base learning rate
         schedulers (list): learning rate schedulers
     """
-    __category__ = 'optim'
 
-    def __init__(self,
-                 base_lr=0.01,
-                 schedulers=[PiecewiseDecay(), LinearWarmup()]):
+    __category__ = "optim"
+
+    def __init__(self, base_lr=0.01, schedulers=[PiecewiseDecay(), LinearWarmup()]):
         super(LearningRate, self).__init__()
         self.base_lr = base_lr
         self.schedulers = []
@@ -248,35 +244,36 @@ class LearningRate(object):
     def __call__(self, step_per_epoch):
         assert len(self.schedulers) >= 1
         if not self.schedulers[0].use_warmup:
-            return self.schedulers[0](base_lr=self.base_lr,
-                                      step_per_epoch=step_per_epoch)
+            return self.schedulers[0](
+                base_lr=self.base_lr, step_per_epoch=step_per_epoch
+            )
 
         # TODO: split warmup & decay
         # warmup
         boundary, value = self.schedulers[1](self.base_lr, step_per_epoch)
         # decay
-        decay_lr = self.schedulers[0](self.base_lr, boundary, value,
-                                      step_per_epoch)
+        decay_lr = self.schedulers[0](self.base_lr, boundary, value, step_per_epoch)
         return decay_lr
 
 
 @register
-class OptimizerBuilder():
+class OptimizerBuilder:
     """
     Build optimizer handles
     Args:
         regularizer (object): an `Regularizer` instance
         optimizer (object): an `Optimizer` instance
     """
-    __category__ = 'optim'
 
-    def __init__(self,
-                 clip_grad_by_norm=None,
-                 clip_grad_by_value=None,
-                 regularizer={'type': 'L2',
-                              'factor': .0001},
-                 optimizer={'type': 'Momentum',
-                            'momentum': .9}):
+    __category__ = "optim"
+
+    def __init__(
+        self,
+        clip_grad_by_norm=None,
+        clip_grad_by_value=None,
+        regularizer={"type": "L2", "factor": 0.0001},
+        optimizer={"type": "Momentum", "momentum": 0.9},
+    ):
         self.clip_grad_by_norm = clip_grad_by_norm
         self.clip_grad_by_value = clip_grad_by_value
         self.regularizer = regularizer
@@ -284,58 +281,59 @@ class OptimizerBuilder():
 
     def __call__(self, learning_rate, model=None):
         if self.clip_grad_by_norm is not None:
-            grad_clip = nn.ClipGradByGlobalNorm(
-                clip_norm=self.clip_grad_by_norm)
+            grad_clip = nn.ClipGradByGlobalNorm(clip_norm=self.clip_grad_by_norm)
         elif self.clip_grad_by_value is not None:
             var = abs(self.clip_grad_by_value)
             grad_clip = nn.ClipGradByValue(min=-var, max=var)
         else:
             grad_clip = None
-        if self.regularizer and self.regularizer != 'None':
-            reg_type = self.regularizer['type'] + 'Decay'
-            reg_factor = self.regularizer['factor']
+        if self.regularizer and self.regularizer != "None":
+            reg_type = self.regularizer["type"] + "Decay"
+            reg_factor = self.regularizer["factor"]
             regularization = getattr(regularizer, reg_type)(reg_factor)
         else:
             regularization = None
 
         optim_args = self.optimizer.copy()
-        optim_type = optim_args['type']
-        del optim_args['type']
+        optim_type = optim_args["type"]
+        del optim_args["type"]
 
-        if optim_type != 'AdamW':
-            optim_args['weight_decay'] = regularization
+        if optim_type != "AdamW":
+            optim_args["weight_decay"] = regularization
 
         op = getattr(optimizer, optim_type)
 
-        if 'param_groups' in optim_args:
-            assert isinstance(optim_args['param_groups'], list), ''
+        if "param_groups" in optim_args:
+            assert isinstance(optim_args["param_groups"], list), ""
 
-            param_groups = optim_args.pop('param_groups')
+            param_groups = optim_args.pop("param_groups")
 
             params, visited = [], []
             for group in param_groups:
-                assert isinstance(group,
-                                  dict) and 'params' in group and isinstance(
-                                      group['params'], list), ''
+                assert (
+                    isinstance(group, dict)
+                    and "params" in group
+                    and isinstance(group["params"], list)
+                ), ""
                 _params = {
                     n: p
                     for n, p in model.named_parameters()
-                    if any([k in n
-                            for k in group['params']]) and p.trainable is True
+                    if any([k in n for k in group["params"]]) and p.trainable is True
                 }
                 _group = group.copy()
-                _group.update({'params': list(_params.values())})
+                _group.update({"params": list(_params.values())})
 
                 params.append(_group)
                 visited.extend(list(_params.keys()))
 
             ext_params = [
-                p for n, p in model.named_parameters()
+                p
+                for n, p in model.named_parameters()
                 if n not in visited and p.trainable is True
             ]
 
             if len(ext_params) < len(model.parameters()):
-                params.append({'params': ext_params})
+                params.append({"params": ext_params})
 
             elif len(ext_params) > len(model.parameters()):
                 raise RuntimeError
@@ -344,7 +342,9 @@ class OptimizerBuilder():
             _params = model.parameters()
             params = [param for param in _params if param.trainable is True]
 
-        return op(learning_rate=learning_rate,
-                  parameters=params,
-                  grad_clip=grad_clip,
-                  **optim_args)
+        return op(
+            learning_rate=learning_rate,
+            parameters=params,
+            grad_clip=grad_clip,
+            **optim_args,
+        )

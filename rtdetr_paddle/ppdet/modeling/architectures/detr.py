@@ -12,32 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import paddle
-from .meta_arch import BaseArch
-from ppdet.core.workspace import register, create
 
-__all__ = ['DETR']
+from ppdet.core.workspace import create, register
+
+from .meta_arch import BaseArch
+
+__all__ = ["DETR"]
 # Deformable DETR, DINO use the same architecture as DETR
 
 
 @register
 class DETR(BaseArch):
-    __category__ = 'architecture'
-    __inject__ = ['post_process']
-    __shared__ = ['with_mask', 'exclude_post_process']
+    __category__ = "architecture"
+    __inject__ = ["post_process"]
+    __shared__ = ["with_mask", "exclude_post_process"]
 
-    def __init__(self,
-                 backbone,
-                 transformer='DETRTransformer',
-                 detr_head='DETRHead',
-                 neck=None,
-                 post_process='DETRPostProcess',
-                 with_mask=False,
-                 exclude_post_process=False):
+    def __init__(
+        self,
+        backbone,
+        transformer="DETRTransformer",
+        detr_head="DETRHead",
+        neck=None,
+        post_process="DETRPostProcess",
+        with_mask=False,
+        exclude_post_process=False,
+    ):
         super(DETR, self).__init__()
         self.backbone = backbone
         self.transformer = transformer
@@ -50,28 +52,28 @@ class DETR(BaseArch):
     @classmethod
     def from_config(cls, cfg, *args, **kwargs):
         # backbone
-        backbone = create(cfg['backbone'])
+        backbone = create(cfg["backbone"])
         # neck
-        kwargs = {'input_shape': backbone.out_shape}
-        neck = create(cfg['neck'], **kwargs) if cfg['neck'] else None
+        kwargs = {"input_shape": backbone.out_shape}
+        neck = create(cfg["neck"], **kwargs) if cfg["neck"] else None
 
         # transformer
         if neck is not None:
-            kwargs = {'input_shape': neck.out_shape}
-        transformer = create(cfg['transformer'], **kwargs)
+            kwargs = {"input_shape": neck.out_shape}
+        transformer = create(cfg["transformer"], **kwargs)
         # head
         kwargs = {
-            'hidden_dim': transformer.hidden_dim,
-            'nhead': transformer.nhead,
-            'input_shape': backbone.out_shape
+            "hidden_dim": transformer.hidden_dim,
+            "nhead": transformer.nhead,
+            "input_shape": backbone.out_shape,
         }
-        detr_head = create(cfg['detr_head'], **kwargs)
+        detr_head = create(cfg["detr_head"], **kwargs)
 
         return {
-            'backbone': backbone,
-            'transformer': transformer,
+            "backbone": backbone,
+            "transformer": transformer,
             "detr_head": detr_head,
-            "neck": neck
+            "neck": neck,
         }
 
     def _forward(self):
@@ -83,17 +85,19 @@ class DETR(BaseArch):
             body_feats = self.neck(body_feats)
 
         # Transformer
-        pad_mask = self.inputs.get('pad_mask', None)
+        pad_mask = self.inputs.get("pad_mask", None)
         out_transformer = self.transformer(body_feats, pad_mask, self.inputs)
 
         # DETR Head
         if self.training:
-            detr_losses = self.detr_head(out_transformer, body_feats,
-                                         self.inputs)
-            detr_losses.update({
-                'loss': paddle.add_n(
-                    [v for k, v in detr_losses.items() if 'log' not in k])
-            })
+            detr_losses = self.detr_head(out_transformer, body_feats, self.inputs)
+            detr_losses.update(
+                {
+                    "loss": paddle.add_n(
+                        [v for k, v in detr_losses.items() if "log" not in k]
+                    )
+                }
+            )
             return detr_losses
         else:
             preds = self.detr_head(out_transformer, body_feats)
@@ -101,12 +105,15 @@ class DETR(BaseArch):
                 bbox, bbox_num, mask = preds
             else:
                 bbox, bbox_num, mask = self.post_process(
-                    preds, self.inputs['im_shape'], self.inputs['scale_factor'],
-                    paddle.shape(self.inputs['image'])[2:])
+                    preds,
+                    self.inputs["im_shape"],
+                    self.inputs["scale_factor"],
+                    paddle.shape(self.inputs["image"])[2:],
+                )
 
-            output = {'bbox': bbox, 'bbox_num': bbox_num}
+            output = {"bbox": bbox, "bbox_num": bbox_num}
             if self.with_mask:
-                output['mask'] = mask
+                output["mask"] = mask
             return output
 
     def get_loss(self):

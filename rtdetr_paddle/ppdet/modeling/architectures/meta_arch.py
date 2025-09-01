@@ -1,21 +1,20 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
+
+import typing
 
 import numpy as np
 import paddle
 import paddle.nn as nn
-import typing
 
 from ppdet.core.workspace import register
 from ppdet.modeling.post_process import nms
 
-__all__ = ['BaseArch']
+__all__ = ["BaseArch"]
 
 
 @register
 class BaseArch(nn.Layer):
-    def __init__(self, data_format='NCHW', use_extra_data=False):
+    def __init__(self, data_format="NCHW", use_extra_data=False):
         super(BaseArch, self).__init__()
         self.data_format = data_format
         self.inputs = {}
@@ -23,18 +22,17 @@ class BaseArch(nn.Layer):
         self.use_extra_data = use_extra_data
 
     def load_meanstd(self, cfg_transform):
-        scale = 1.
+        scale = 1.0
         mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
         for item in cfg_transform:
-            if 'NormalizeImage' in item:
-                mean = np.array(
-                    item['NormalizeImage']['mean'], dtype=np.float32)
-                std = np.array(item['NormalizeImage']['std'], dtype=np.float32)
-                if item['NormalizeImage'].get('is_scale', True):
-                    scale = 1. / 255.
+            if "NormalizeImage" in item:
+                mean = np.array(item["NormalizeImage"]["mean"], dtype=np.float32)
+                std = np.array(item["NormalizeImage"]["std"], dtype=np.float32)
+                if item["NormalizeImage"].get("is_scale", True):
+                    scale = 1.0 / 255.0
                 break
-        if self.data_format == 'NHWC':
+        if self.data_format == "NHWC":
             self.scale = paddle.to_tensor(scale / std).reshape((1, 1, 1, 3))
             self.bias = paddle.to_tensor(-mean / std).reshape((1, 1, 1, 3))
         else:
@@ -42,15 +40,15 @@ class BaseArch(nn.Layer):
             self.bias = paddle.to_tensor(-mean / std).reshape((1, 3, 1, 1))
 
     def forward(self, inputs):
-        if self.data_format == 'NHWC':
-            image = inputs['image']
-            inputs['image'] = paddle.transpose(image, [0, 2, 3, 1])
+        if self.data_format == "NHWC":
+            image = inputs["image"]
+            inputs["image"] = paddle.transpose(image, [0, 2, 3, 1])
 
         if self.fuse_norm:
-            image = inputs['image']
-            self.inputs['image'] = image * self.scale + self.bias
-            self.inputs['im_shape'] = inputs['im_shape']
-            self.inputs['scale_factor'] = inputs['scale_factor']
+            image = inputs["image"]
+            self.inputs["image"] = image * self.scale + self.bias
+            self.inputs["im_shape"] = inputs["im_shape"]
+            self.inputs["scale_factor"] = inputs["scale_factor"]
         else:
             self.inputs = inputs
 
@@ -68,9 +66,9 @@ class BaseArch(nn.Layer):
             outs = []
             for inp in inputs_list:
                 if self.fuse_norm:
-                    self.inputs['image'] = inp['image'] * self.scale + self.bias
-                    self.inputs['im_shape'] = inp['im_shape']
-                    self.inputs['scale_factor'] = inp['scale_factor']
+                    self.inputs["image"] = inp["image"] * self.scale + self.bias
+                    self.inputs["im_shape"] = inp["im_shape"]
+                    self.inputs["scale_factor"] = inp["scale_factor"]
                 else:
                     self.inputs = inp
                 outs.append(self.get_pred())
@@ -88,7 +86,7 @@ class BaseArch(nn.Layer):
         nms_threshold = 0.5
         keep_top_k = 100
 
-        if self.__class__.__name__ in ('CascadeRCNN', 'FasterRCNN', 'MaskRCNN'):
+        if self.__class__.__name__ in ("CascadeRCNN", "FasterRCNN", "MaskRCNN"):
             num_classes = self.bbox_head.num_classes
             keep_top_k = self.bbox_post_process.nms.keep_top_k
             nms_threshold = self.bbox_post_process.nms.nms_threshold
@@ -98,20 +96,26 @@ class BaseArch(nn.Layer):
             )
 
         final_boxes = []
-        all_scale_outs = paddle.concat([o['bbox'] for o in outs]).numpy()
+        all_scale_outs = paddle.concat([o["bbox"] for o in outs]).numpy()
         for c in range(num_classes):
             idxs = all_scale_outs[:, 0] == c
             if np.count_nonzero(idxs) == 0:
                 continue
             r = nms(all_scale_outs[idxs, 1:], nms_threshold)
-            final_boxes.append(
-                np.concatenate([np.full((r.shape[0], 1), c), r], 1))
+            final_boxes.append(np.concatenate([np.full((r.shape[0], 1), c), r], 1))
         out = np.concatenate(final_boxes)
-        out = np.concatenate(sorted(
-            out, key=lambda e: e[1])[-keep_top_k:]).reshape((-1, 6))
+        out = np.concatenate(sorted(out, key=lambda e: e[1])[-keep_top_k:]).reshape(
+            (-1, 6)
+        )
         out = {
-            'bbox': paddle.to_tensor(out),
-            'bbox_num': paddle.to_tensor(np.array([out.shape[0], ]))
+            "bbox": paddle.to_tensor(out),
+            "bbox_num": paddle.to_tensor(
+                np.array(
+                    [
+                        out.shape[0],
+                    ]
+                )
+            ),
         }
 
         return out
@@ -122,11 +126,17 @@ class BaseArch(nn.Layer):
             inputs[k] = data[i]
         return inputs
 
-    def model_arch(self, ):
+    def model_arch(
+        self,
+    ):
         pass
 
-    def get_loss(self, ):
+    def get_loss(
+        self,
+    ):
         raise NotImplementedError("Should implement get_loss method!")
 
-    def get_pred(self, ):
+    def get_pred(
+        self,
+    ):
         raise NotImplementedError("Should implement get_pred method!")

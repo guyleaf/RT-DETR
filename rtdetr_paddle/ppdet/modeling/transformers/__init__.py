@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .utils import *
+from .dino_transformer import *
+from .hybrid_encoder import *
 from .matchers import *
 from .position_encoding import *
 from .rtdetr_transformer import *
-from .dino_transformer import *
-from .hybrid_encoder import *
+from .utils import *

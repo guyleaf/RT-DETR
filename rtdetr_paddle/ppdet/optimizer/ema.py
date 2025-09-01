@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import math
-import paddle
 import weakref
 from copy import deepcopy
 
+import paddle
+
 from .utils import get_bn_running_state_names
 
-__all__ = ['ModelEMA', 'SimpleModelEMA']
+__all__ = ["ModelEMA", "SimpleModelEMA"]
 
 
 class ModelEMA(object):
@@ -46,20 +45,23 @@ class ModelEMA(object):
             calculation. Default: None.
     """
 
-    def __init__(self,
-                 model,
-                 decay=0.9998,
-                 ema_decay_type='threshold',
-                 cycle_epoch=-1,
-                 ema_black_list=None,
-                 ema_filter_no_grad=False):
+    def __init__(
+        self,
+        model,
+        decay=0.9998,
+        ema_decay_type="threshold",
+        cycle_epoch=-1,
+        ema_black_list=None,
+        ema_filter_no_grad=False,
+    ):
         self.step = 0
         self.epoch = 0
         self.decay = decay
         self.ema_decay_type = ema_decay_type
         self.cycle_epoch = cycle_epoch
         self.ema_black_list = self._match_ema_black_list(
-            model.state_dict().keys(), ema_black_list)
+            model.state_dict().keys(), ema_black_list
+        )
         bn_states_names = get_bn_running_state_names(model)
         if ema_filter_no_grad:
             for n, p in model.named_parameters():
@@ -73,10 +75,7 @@ class ModelEMA(object):
             else:
                 self.state_dict[k] = paddle.zeros_like(v)
 
-        self._model_state = {
-            k: weakref.ref(p)
-            for k, p in model.state_dict().items()
-        }
+        self._model_state = {k: weakref.ref(p) for k, p in model.state_dict().items()}
 
     def reset(self):
         self.step = 0
@@ -97,9 +96,9 @@ class ModelEMA(object):
         self.step = step
 
     def update(self, model=None):
-        if self.ema_decay_type == 'threshold':
+        if self.ema_decay_type == "threshold":
             decay = min(self.decay, (1 + self.step) / (10 + self.step))
-        elif self.ema_decay_type == 'exponential':
+        elif self.ema_decay_type == "exponential":
             decay = self.decay * (1 - math.exp(-(self.step + 1) / 2000))
         else:
             decay = self.decay
@@ -109,8 +108,7 @@ class ModelEMA(object):
             model_dict = model.state_dict()
         else:
             model_dict = {k: p() for k, p in self._model_state.items()}
-            assert all(
-                [v is not None for _, v in model_dict.items()]), 'python gc.'
+            assert all([v is not None for _, v in model_dict.items()]), "python gc."
 
         for k, v in self.state_dict.items():
             if k not in self.ema_black_list:
@@ -128,7 +126,7 @@ class ModelEMA(object):
                 v.stop_gradient = True
                 state_dict[k] = v
             else:
-                if self.ema_decay_type != 'exponential':
+                if self.ema_decay_type != "exponential":
                     v = v / (1 - self._decay**self.step)
                 v.stop_gradient = True
                 state_dict[k] = v

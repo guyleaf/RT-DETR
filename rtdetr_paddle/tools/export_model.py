@@ -12,29 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import os
 import sys
 
 # add python path of PaddleDetection to sys.path
-parent_path = os.path.abspath(os.path.join(__file__, *(['..'] * 2)))
+parent_path = os.path.abspath(os.path.join(__file__, *([".."] * 2)))
 sys.path.insert(0, parent_path)
 
 # ignore warning log
 import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 import paddle
 from ppdet.core.workspace import load_config, merge_config
-from ppdet.utils.check import check_gpu, check_version, check_config
-from ppdet.utils.cli import ArgsParser
 from ppdet.engine import Trainer
-
+from ppdet.utils.check import check_config, check_gpu, check_version
+from ppdet.utils.cli import ArgsParser
 from ppdet.utils.logger import setup_logger
-logger = setup_logger('export_model')
+
+logger = setup_logger("export_model")
 
 
 def parse_args():
@@ -43,23 +42,26 @@ def parse_args():
         "--output_dir",
         type=str,
         default="output_inference",
-        help="Directory for storing the output model files.")
+        help="Directory for storing the output model files.",
+    )
     parser.add_argument(
         "--export_serving_model",
         type=bool,
         default=False,
-        help="Whether to export serving model or not.")
+        help="Whether to export serving model or not.",
+    )
     parser.add_argument(
         "--slim_config",
         default=None,
         type=str,
-        help="Configuration file of slim method.")
+        help="Configuration file of slim method.",
+    )
     args = parser.parse_args()
     return args
 
 
 def run(FLAGS, cfg):
-    trainer = Trainer(cfg, mode='test')
+    trainer = Trainer(cfg, mode="test")
     # load weights
     trainer.load_weights(cfg.weights)
 
@@ -68,16 +70,16 @@ def run(FLAGS, cfg):
 
     if FLAGS.export_serving_model:
         from paddle_serving_client.io import inference_model_to_serving
+
         model_name = os.path.splitext(os.path.split(cfg.filename)[-1])[0]
 
         inference_model_to_serving(
             dirname="{}/{}".format(FLAGS.output_dir, model_name),
-            serving_server="{}/{}/serving_server".format(FLAGS.output_dir,
-                                                         model_name),
-            serving_client="{}/{}/serving_client".format(FLAGS.output_dir,
-                                                         model_name),
+            serving_server="{}/{}/serving_server".format(FLAGS.output_dir, model_name),
+            serving_client="{}/{}/serving_client".format(FLAGS.output_dir, model_name),
             model_filename="model.pdmodel",
-            params_filename="model.pdiparams")
+            params_filename="model.pdiparams",
+        )
 
 
 def main():
@@ -89,7 +91,7 @@ def main():
     # FIXME: Temporarily solve the priority problem of FLAGS.opt
     merge_config(FLAGS.opt)
     check_config(cfg)
-    if 'use_gpu' not in cfg:
+    if "use_gpu" not in cfg:
         cfg.use_gpu = False
     check_gpu(cfg.use_gpu)
     check_version()
@@ -97,5 +99,5 @@ def main():
     run(FLAGS, cfg)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

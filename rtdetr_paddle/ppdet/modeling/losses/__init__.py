@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .iou_loss import *
-from .gfocal_loss import *
 from .detr_loss import *
 from .focal_loss import *
+from .gfocal_loss import *
+from .iou_loss import *
 from .smooth_l1_loss import *
