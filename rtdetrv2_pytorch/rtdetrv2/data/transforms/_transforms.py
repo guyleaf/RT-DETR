@@ -1,7 +1,6 @@
 """ "Copyright(c) 2023 lyuwenyu. All Rights Reserved."""
 
 import torch
-import torch.nn as nn
 import torchvision
 
 torchvision.disable_beta_transforms_warning()
@@ -64,6 +63,9 @@ class PadToSize(T.Pad):
         self.padding = [0, 0, w, h]
         return dict(padding=self.padding)
 
+    def make_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
+        return self._get_params(flat_inputs)
+
     def __init__(self, size, fill=0, padding_mode="constant") -> None:
         if isinstance(size, int):
             size = (size, size)
@@ -74,6 +76,9 @@ class PadToSize(T.Pad):
         fill = self._fill[type(inpt)]
         padding = params["padding"]
         return F.pad(inpt, padding=padding, fill=fill, padding_mode=self.padding_mode)  # type: ignore[arg-type]
+
+    def transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
+        return self._transform(inpt, params)
 
     def __call__(self, *inputs: Any) -> Any:
         outputs = super().forward(*inputs)
