@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from typing import Any, Dict, List, Optional
 
 from rtdetrv2.core import YAMLConfig
+from rtdetrv2.misc import import_modules
 
 __all__ = ["profile_stats"]
 
@@ -90,7 +91,16 @@ if __name__ == "__main__":
         default="cuda:0",
         help="device",
     )
+    parser.add_argument(
+        "--preloads",
+        type=str,
+        nargs="*",
+        default=[],
+        help="preload modules before execution",
+    )
     args = parser.parse_args()
+
+    import_modules(args.preloads)
 
     cfg = YAMLConfig(args.config, device=args.device)
     model = cfg.model.to(args.device)
