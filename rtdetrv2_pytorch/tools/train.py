@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import argparse
 
 from rtdetrv2.core import YAMLConfig, yaml_utils
-from rtdetrv2.misc import dist_utils
+from rtdetrv2.misc import dist_utils, import_modules
 from rtdetrv2.solver import TASKS
 
 
@@ -83,6 +83,14 @@ if __name__ == "__main__":
     parser.add_argument("--print-rank", type=int, default=0, help="print rank id")
 
     parser.add_argument("--local-rank", type=int, help="local rank id")
+    parser.add_argument(
+        "--preloads",
+        type=str,
+        nargs="*",
+        default=[],
+        help="preload modules before execution",
+    )
     args = parser.parse_args()
 
+    import_modules(args.preloads)
     main(args)
