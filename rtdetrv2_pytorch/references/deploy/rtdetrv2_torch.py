@@ -5,6 +5,7 @@ import torch.nn as nn
 import torchvision.transforms as T
 from PIL import Image, ImageDraw
 from rtdetrv2.core import YAMLConfig
+from rtdetrv2.misc import import_modules
 
 
 def draw(images, labels, boxes, scores, thrh=0.6):
@@ -101,5 +102,14 @@ if __name__ == "__main__":
         type=str,
     )
     parser.add_argument("-d", "--device", type=str, default="cpu")
+    parser.add_argument(
+        "--preloads",
+        type=str,
+        nargs="*",
+        default=[],
+        help="preload modules before execution",
+    )
     args = parser.parse_args()
+    
+    import_modules(args.preloads)
     main(args)

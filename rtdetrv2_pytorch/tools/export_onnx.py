@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import torch
 import torch.nn as nn
 from rtdetrv2.core import YAMLConfig
+from rtdetrv2.misc import import_modules
 
 
 def main(
@@ -117,7 +118,15 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "--preloads",
+        type=str,
+        nargs="*",
+        default=[],
+        help="preload modules before execution",
+    )
 
     args = parser.parse_args()
 
+    import_modules(args.preloads)
     main(args)
