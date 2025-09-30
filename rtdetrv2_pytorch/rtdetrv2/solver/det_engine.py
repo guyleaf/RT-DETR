@@ -52,7 +52,7 @@ def train_one_epoch(
         metas = dict(epoch=epoch, step=i, global_step=global_step)
 
         if scaler is not None:
-            with torch.autocast(device_type=str(device), cache_enabled=True):
+            with torch.autocast(device_type=device.type, cache_enabled=True):
                 outputs = model(samples, targets=targets)
                 loss_dict = criterion(outputs, targets, **metas)
 
