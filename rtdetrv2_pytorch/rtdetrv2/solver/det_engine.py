@@ -61,12 +61,13 @@ def train_one_epoch(
             loss = sum(loss_dict.values())
             scaler.scale(loss).backward()
 
+            scaler.unscale_(optimizer)
             if max_norm > 0:
-                scaler.unscale_(optimizer)
                 total_norm = torch.nn.utils.clip_grad_norm_(
                     model.parameters(), max_norm
                 )
-                loss_dict["grad_norm"] = total_norm
+            else:
+                total_norm = torch.nn.utils.get_total_norm(model.parameters())
 
             scaler.step(optimizer)
             scaler.update()
@@ -84,7 +85,8 @@ def train_one_epoch(
                 total_norm = torch.nn.utils.clip_grad_norm_(
                     model.parameters(), max_norm
                 )
-                loss_dict["grad_norm"] = total_norm
+            else:
+                total_norm = torch.nn.utils.get_total_norm(model.parameters())
 
             optimizer.step()
 
@@ -102,6 +104,10 @@ def train_one_epoch(
             print("Loss is {}, stopping training".format(loss_value))
             print(loss_dict_reduced)
             sys.exit(1)
+
+        # collect other values for logging
+        dist_utils.all_reduce(total_norm)
+        loss_dict_reduced["grad_norm"] = total_norm
 
         metric_logger.update(loss=loss_value, **loss_dict_reduced)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
