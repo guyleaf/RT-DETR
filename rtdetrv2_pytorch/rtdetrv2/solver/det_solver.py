@@ -6,7 +6,7 @@ import time
 
 import torch
 
-from ..misc import dist_utils, profiler_utils
+from ..misc import dist_utils
 from ._solver import BaseSolver
 from .det_engine import evaluate, train_one_epoch
 
@@ -142,8 +142,12 @@ class DetSolver(BaseSolver):
             self.device,
         )
 
-        if self.output_dir:
-            dist_utils.save_on_master(
+        if self.output_dir and dist_utils.is_main_process():
+            log_stats = {f"test_{k}": v for k, v in test_stats.items()}
+            with (self.output_dir / "log.txt").open("w") as f:
+                f.write(json.dumps(log_stats) + "\n")
+
+            torch.save(
                 coco_evaluator.coco_eval["bbox"].eval, self.output_dir / "eval.pth"
             )
 
