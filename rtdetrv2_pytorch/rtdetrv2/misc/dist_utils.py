@@ -228,6 +228,18 @@ def reduce_dict(data, avg=True):
         return {k: v for k, v in zip(keys, values)}
 
 
+def all_reduce(data, op=tdist.ReduceOp.SUM):
+    """
+    Run all_reduce on torch.Tensor data
+    Args:
+        data: torch.Tensor
+    """
+    world_size = get_world_size()
+    if world_size == 1:
+        return
+    tdist.all_reduce(data, op=op)
+
+
 def all_gather(data):
     """
     Run all_gather on arbitrary picklable data (not necessarily tensors)
