@@ -63,7 +63,10 @@ def train_one_epoch(
 
             if max_norm > 0:
                 scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+                total_norm = torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), max_norm
+                )
+                loss_dict["grad_norm"] = total_norm
 
             scaler.step(optimizer)
             scaler.update()
@@ -78,7 +81,10 @@ def train_one_epoch(
             loss.backward()
 
             if max_norm > 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+                total_norm = torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), max_norm
+                )
+                loss_dict["grad_norm"] = total_norm
 
             optimizer.step()
 
