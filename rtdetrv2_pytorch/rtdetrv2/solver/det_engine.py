@@ -54,8 +54,6 @@ def train_one_epoch(
         if scaler is not None:
             with torch.autocast(device_type=str(device), cache_enabled=True):
                 outputs = model(samples, targets=targets)
-
-            with torch.autocast(device_type=str(device), enabled=False):
                 loss_dict = criterion(outputs, targets, **metas)
 
             loss = sum(loss_dict.values())
