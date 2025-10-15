@@ -21,7 +21,7 @@ def _get_class_default_kwargs(cls, *args, **kwargs):
     varnames = cls.__init__.__code__.co_varnames
     argcount = cls.__init__.__code__.co_argcount
     keys = varnames[:argcount]
-    assert keys[0] == 'self'
+    assert keys[0] == "self"
     keys = keys[1:]
 
     values = list(cls.__init__.__defaults__)

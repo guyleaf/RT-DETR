@@ -14,28 +14,30 @@
 
 import copy
 import os
-import traceback
-import six
 import sys
+import traceback
+
+import six
+
 if sys.version_info >= (3, 0):
     pass
 else:
     pass
+from copy import deepcopy
+
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-
-from copy import deepcopy
-
 from paddle.io import DataLoader, DistributedBatchSampler
-from .utils import default_collate_fn
 
 from ppdet.core.workspace import register
+from ppdet.utils.logger import setup_logger
+
 from . import transform
 from .shm_utils import _get_shared_memory_size_in_M
+from .utils import default_collate_fn
 
-from ppdet.utils.logger import setup_logger
-logger = setup_logger('reader')
+logger = setup_logger("reader")
 
 MAIN_PID = os.getpid()
 
@@ -48,7 +50,7 @@ class Compose(object):
             for k, v in t.items():
                 op_cls = getattr(transform, k)
                 f = op_cls(**v)
-                if hasattr(f, 'num_classes'):
+                if hasattr(f, "num_classes"):
                     f.num_classes = num_classes
 
                 self.transforms_cls.append(f)
@@ -59,9 +61,10 @@ class Compose(object):
                 data = f(data)
             except Exception as e:
                 stack_info = traceback.format_exc()
-                logger.warning("fail to map sample transform [{}] "
-                               "with error: {} and stack:\n{}".format(
-                                   f, e, str(stack_info)))
+                logger.warning(
+                    "fail to map sample transform [{}] "
+                    "with error: {} and stack:\n{}".format(f, e, str(stack_info))
+                )
                 raise e
 
         return data
@@ -78,13 +81,14 @@ class BatchCompose(Compose):
                 data = f(data)
             except Exception as e:
                 stack_info = traceback.format_exc()
-                logger.warning("fail to map batch transform [{}] "
-                               "with error: {} and stack:\n{}".format(
-                                   f, e, str(stack_info)))
+                logger.warning(
+                    "fail to map batch transform [{}] "
+                    "with error: {} and stack:\n{}".format(f, e, str(stack_info))
+                )
                 raise e
 
         # remove keys which is not needed by model
-        extra_key = ['h', 'w', 'flipped']
+        extra_key = ["h", "w", "flipped"]
         for k in extra_key:
             for sample in data:
                 if k in sample:
@@ -100,7 +104,7 @@ class BatchCompose(Compose):
                 tmp_data = []
                 for i in range(len(data)):
                     tmp_data.append(data[i][k])
-                if not 'gt_' in k and not 'is_crowd' in k and not 'difficult' in k:
+                if not "gt_" in k and not "is_crowd" in k and not "difficult" in k:
                     tmp_data = np.stack(tmp_data, axis=0)
                 batch_data[k] = tmp_data
         return batch_data
@@ -123,7 +127,7 @@ class BaseDataLoader(object):
         collate_batch (bool): whether to collate batch in dataloader.
             If set to True, the samples will collate into batch according
             to the batch size. Otherwise, the ground-truth will not collate,
-            which is used when the number of ground-truch is different in 
+            which is used when the number of ground-truch is different in
             samples.
         use_shared_memory (bool): whether to use shared memory to
                 accelerate data loading, enable this only if you
@@ -135,34 +139,32 @@ class BaseDataLoader(object):
                 Default False.
     """
 
-    def __init__(self,
-                 sample_transforms=[],
-                 batch_transforms=[],
-                 batch_size=1,
-                 shuffle=False,
-                 drop_last=False,
-                 num_classes=80,
-                 collate_batch=True,
-                 use_shared_memory=False,
-                 **kwargs):
+    def __init__(
+        self,
+        sample_transforms=[],
+        batch_transforms=[],
+        batch_size=1,
+        shuffle=False,
+        drop_last=False,
+        num_classes=80,
+        collate_batch=True,
+        use_shared_memory=False,
+        **kwargs,
+    ):
         # sample transform
-        self._sample_transforms = Compose(
-            sample_transforms, num_classes=num_classes)
+        self._sample_transforms = Compose(sample_transforms, num_classes=num_classes)
 
-        # batch transfrom 
-        self._batch_transforms = BatchCompose(batch_transforms, num_classes,
-                                              collate_batch)
+        # batch transfrom
+        self._batch_transforms = BatchCompose(
+            batch_transforms, num_classes, collate_batch
+        )
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.drop_last = drop_last
         self.use_shared_memory = use_shared_memory
         self.kwargs = kwargs
 
-    def __call__(self,
-                 dataset,
-                 worker_num,
-                 batch_sampler=None,
-                 return_list=False):
+    def __call__(self, dataset, worker_num, batch_sampler=None, return_list=False):
         self.dataset = dataset
         self.dataset.check_or_download_dataset()
         self.dataset.parse_dataset()
@@ -176,20 +178,25 @@ class BaseDataLoader(object):
                 self.dataset,
                 batch_size=self.batch_size,
                 shuffle=self.shuffle,
-                drop_last=self.drop_last)
+                drop_last=self.drop_last,
+            )
         else:
             self._batch_sampler = batch_sampler
 
         # DataLoader do not start sub-process in Windows and Mac
         # system, do not need to use shared memory
-        use_shared_memory = self.use_shared_memory and \
-                            sys.platform not in ['win32', 'darwin']
+        use_shared_memory = self.use_shared_memory and sys.platform not in [
+            "win32",
+            "darwin",
+        ]
         # check whether shared memory size is bigger than 1G(1024M)
         if use_shared_memory:
             shm_size = _get_shared_memory_size_in_M()
-            if shm_size is not None and shm_size < 1024.:
-                logger.warning("Shared memory size is less than 1G, "
-                               "disable shared_memory in DataLoader")
+            if shm_size is not None and shm_size < 1024.0:
+                logger.warning(
+                    "Shared memory size is less than 1G, "
+                    "disable shared_memory in DataLoader"
+                )
                 use_shared_memory = False
 
         self.dataloader = DataLoader(
@@ -198,7 +205,8 @@ class BaseDataLoader(object):
             collate_fn=self._batch_transforms,
             num_workers=worker_num,
             return_list=return_list,
-            use_shared_memory=use_shared_memory)
+            use_shared_memory=use_shared_memory,
+        )
         self.loader = iter(self.dataloader)
 
         return self
@@ -223,52 +231,76 @@ class BaseDataLoader(object):
 
 @register
 class TrainReader(BaseDataLoader):
-    __shared__ = ['num_classes']
+    __shared__ = ["num_classes"]
 
-    def __init__(self,
-                 sample_transforms=[],
-                 batch_transforms=[],
-                 batch_size=1,
-                 shuffle=True,
-                 drop_last=True,
-                 num_classes=80,
-                 collate_batch=True,
-                 **kwargs):
-        super(TrainReader, self).__init__(sample_transforms, batch_transforms,
-                                          batch_size, shuffle, drop_last,
-                                          num_classes, collate_batch, **kwargs)
+    def __init__(
+        self,
+        sample_transforms=[],
+        batch_transforms=[],
+        batch_size=1,
+        shuffle=True,
+        drop_last=True,
+        num_classes=80,
+        collate_batch=True,
+        **kwargs,
+    ):
+        super(TrainReader, self).__init__(
+            sample_transforms,
+            batch_transforms,
+            batch_size,
+            shuffle,
+            drop_last,
+            num_classes,
+            collate_batch,
+            **kwargs,
+        )
 
 
 @register
 class EvalReader(BaseDataLoader):
-    __shared__ = ['num_classes']
+    __shared__ = ["num_classes"]
 
-    def __init__(self,
-                 sample_transforms=[],
-                 batch_transforms=[],
-                 batch_size=1,
-                 shuffle=False,
-                 drop_last=False,
-                 num_classes=80,
-                 **kwargs):
-        super(EvalReader, self).__init__(sample_transforms, batch_transforms,
-                                         batch_size, shuffle, drop_last,
-                                         num_classes, **kwargs)
+    def __init__(
+        self,
+        sample_transforms=[],
+        batch_transforms=[],
+        batch_size=1,
+        shuffle=False,
+        drop_last=False,
+        num_classes=80,
+        **kwargs,
+    ):
+        super(EvalReader, self).__init__(
+            sample_transforms,
+            batch_transforms,
+            batch_size,
+            shuffle,
+            drop_last,
+            num_classes,
+            **kwargs,
+        )
 
 
 @register
 class TestReader(BaseDataLoader):
-    __shared__ = ['num_classes']
+    __shared__ = ["num_classes"]
 
-    def __init__(self,
-                 sample_transforms=[],
-                 batch_transforms=[],
-                 batch_size=1,
-                 shuffle=False,
-                 drop_last=False,
-                 num_classes=80,
-                 **kwargs):
-        super(TestReader, self).__init__(sample_transforms, batch_transforms,
-                                         batch_size, shuffle, drop_last,
-                                         num_classes, **kwargs)
-
+    def __init__(
+        self,
+        sample_transforms=[],
+        batch_transforms=[],
+        batch_size=1,
+        shuffle=False,
+        drop_last=False,
+        num_classes=80,
+        **kwargs,
+    ):
+        super(TestReader, self).__init__(
+            sample_transforms,
+            batch_transforms,
+            batch_size,
+            shuffle,
+            drop_last,
+            num_classes,
+            **kwargs,
+        )

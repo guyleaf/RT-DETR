@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-This code is the paddle implementation of MobileOne block, see: https://arxiv.org/pdf/2206.04040.pdf. 
+This code is the paddle implementation of MobileOne block, see: https://arxiv.org/pdf/2206.04040.pdf.
 Some codes are based on https://github.com/DingXiaoH/RepVGG/blob/main/repvgg.py
 Ths copyright of microsoft/Swin-Transformer is as follows:
 MIT License [see LICENSE for details]
@@ -21,31 +21,31 @@ MIT License [see LICENSE for details]
 import paddle
 import paddle.nn as nn
 from paddle import ParamAttr
+from paddle.nn.initializer import Constant, Normal
 from paddle.regularizer import L2Decay
-from paddle.nn.initializer import Normal, Constant
 
-from ppdet.modeling.ops import get_act_fn
 from ppdet.modeling.layers import ConvNormLayer
+from ppdet.modeling.ops import get_act_fn
 
 
 class MobileOneBlock(nn.Layer):
     def __init__(
-            self,
-            ch_in,
-            ch_out,
-            stride,
-            kernel_size,
-            conv_num=1,
-            norm_type='bn',
-            norm_decay=0.,
-            norm_groups=32,
-            bias_on=False,
-            lr_scale=1.,
-            freeze_norm=False,
-            initializer=Normal(
-                mean=0., std=0.01),
-            skip_quant=False,
-            act='relu', ):
+        self,
+        ch_in,
+        ch_out,
+        stride,
+        kernel_size,
+        conv_num=1,
+        norm_type="bn",
+        norm_decay=0.0,
+        norm_groups=32,
+        bias_on=False,
+        lr_scale=1.0,
+        freeze_norm=False,
+        initializer=Normal(mean=0.0, std=0.01),
+        skip_quant=False,
+        act="relu",
+    ):
         super(MobileOneBlock, self).__init__()
 
         self.ch_in = ch_in
@@ -72,7 +72,9 @@ class MobileOneBlock(nn.Layer):
                     lr_scale=lr_scale,
                     freeze_norm=freeze_norm,
                     initializer=initializer,
-                    skip_quant=skip_quant))
+                    skip_quant=skip_quant,
+                )
+            )
             self.point_conv.append(
                 ConvNormLayer(
                     ch_in,
@@ -87,7 +89,9 @@ class MobileOneBlock(nn.Layer):
                     lr_scale=lr_scale,
                     freeze_norm=freeze_norm,
                     initializer=initializer,
-                    skip_quant=skip_quant))
+                    skip_quant=skip_quant,
+                )
+            )
         self.rbr_1x1 = ConvNormLayer(
             ch_in,
             ch_in,
@@ -101,19 +105,29 @@ class MobileOneBlock(nn.Layer):
             lr_scale=lr_scale,
             freeze_norm=freeze_norm,
             initializer=initializer,
-            skip_quant=skip_quant)
-        self.rbr_identity_st1 = nn.BatchNorm2D(
-            num_features=ch_in,
-            weight_attr=ParamAttr(regularizer=L2Decay(0.0)),
-            bias_attr=ParamAttr(regularizer=L2Decay(
-                0.0))) if ch_in == ch_out and self.stride == 1 else None
-        self.rbr_identity_st2 = nn.BatchNorm2D(
-            num_features=ch_out,
-            weight_attr=ParamAttr(regularizer=L2Decay(0.0)),
-            bias_attr=ParamAttr(regularizer=L2Decay(
-                0.0))) if ch_in == ch_out and self.stride == 1 else None
-        self.act = get_act_fn(act) if act is None or isinstance(act, (
-            str, dict)) else act
+            skip_quant=skip_quant,
+        )
+        self.rbr_identity_st1 = (
+            nn.BatchNorm2D(
+                num_features=ch_in,
+                weight_attr=ParamAttr(regularizer=L2Decay(0.0)),
+                bias_attr=ParamAttr(regularizer=L2Decay(0.0)),
+            )
+            if ch_in == ch_out and self.stride == 1
+            else None
+        )
+        self.rbr_identity_st2 = (
+            nn.BatchNorm2D(
+                num_features=ch_out,
+                weight_attr=ParamAttr(regularizer=L2Decay(0.0)),
+                bias_attr=ParamAttr(regularizer=L2Decay(0.0)),
+            )
+            if ch_in == ch_out and self.stride == 1
+            else None
+        )
+        self.act = (
+            get_act_fn(act) if act is None or isinstance(act, (str, dict)) else act
+        )
 
     def forward(self, x):
         if hasattr(self, "conv1") and hasattr(self, "conv2"):
@@ -144,7 +158,7 @@ class MobileOneBlock(nn.Layer):
         return y
 
     def convert_to_deploy(self):
-        if not hasattr(self, 'conv1'):
+        if not hasattr(self, "conv1"):
             self.conv1 = nn.Conv2D(
                 in_channels=self.ch_in,
                 out_channels=self.ch_in,
@@ -152,45 +166,49 @@ class MobileOneBlock(nn.Layer):
                 stride=self.stride,
                 padding=self.padding,
                 groups=self.ch_in,
-                bias_attr=ParamAttr(
-                    initializer=Constant(value=0.), learning_rate=1.))
-        if not hasattr(self, 'conv2'):
+                bias_attr=ParamAttr(initializer=Constant(value=0.0), learning_rate=1.0),
+            )
+        if not hasattr(self, "conv2"):
             self.conv2 = nn.Conv2D(
                 in_channels=self.ch_in,
                 out_channels=self.ch_out,
                 kernel_size=1,
                 stride=1,
-                padding='SAME',
+                padding="SAME",
                 groups=1,
-                bias_attr=ParamAttr(
-                    initializer=Constant(value=0.), learning_rate=1.))
+                bias_attr=ParamAttr(initializer=Constant(value=0.0), learning_rate=1.0),
+            )
 
-        conv1_kernel, conv1_bias, conv2_kernel, conv2_bias = self.get_equivalent_kernel_bias(
+        conv1_kernel, conv1_bias, conv2_kernel, conv2_bias = (
+            self.get_equivalent_kernel_bias()
         )
         self.conv1.weight.set_value(conv1_kernel)
         self.conv1.bias.set_value(conv1_bias)
         self.conv2.weight.set_value(conv2_kernel)
         self.conv2.bias.set_value(conv2_bias)
-        self.__delattr__('depth_conv')
-        self.__delattr__('point_conv')
-        self.__delattr__('rbr_1x1')
-        if hasattr(self, 'rbr_identity_st1'):
-            self.__delattr__('rbr_identity_st1')
-        if hasattr(self, 'rbr_identity_st2'):
-            self.__delattr__('rbr_identity_st2')
+        self.__delattr__("depth_conv")
+        self.__delattr__("point_conv")
+        self.__delattr__("rbr_1x1")
+        if hasattr(self, "rbr_identity_st1"):
+            self.__delattr__("rbr_identity_st1")
+        if hasattr(self, "rbr_identity_st2"):
+            self.__delattr__("rbr_identity_st2")
 
     def get_equivalent_kernel_bias(self):
         st1_kernel3x3, st1_bias3x3 = self._fuse_bn_tensor(self.depth_conv)
         st1_kernel1x1, st1_bias1x1 = self._fuse_bn_tensor(self.rbr_1x1)
         st1_kernelid, st1_biasid = self._fuse_bn_tensor(
-            self.rbr_identity_st1, kernel_size=self.kernel_size)
+            self.rbr_identity_st1, kernel_size=self.kernel_size
+        )
 
         st2_kernel1x1, st2_bias1x1 = self._fuse_bn_tensor(self.point_conv)
         st2_kernelid, st2_biasid = self._fuse_bn_tensor(
-            self.rbr_identity_st2, kernel_size=1)
+            self.rbr_identity_st2, kernel_size=1
+        )
 
-        conv1_kernel = st1_kernel3x3 + self._pad_1x1_to_3x3_tensor(
-            st1_kernel1x1) + st1_kernelid
+        conv1_kernel = (
+            st1_kernel3x3 + self._pad_1x1_to_3x3_tensor(st1_kernel1x1) + st1_kernelid
+        )
 
         conv1_bias = st1_bias3x3 + st1_bias1x1 + st1_biasid
 
@@ -205,8 +223,8 @@ class MobileOneBlock(nn.Layer):
         else:
             padding_size = (self.kernel_size - 1) // 2
             return nn.functional.pad(
-                kernel1x1,
-                [padding_size, padding_size, padding_size, padding_size])
+                kernel1x1, [padding_size, padding_size, padding_size, padding_size]
+            )
 
     def _fuse_bn_tensor(self, branch, kernel_size=3):
         if branch is None:
@@ -242,12 +260,13 @@ class MobileOneBlock(nn.Layer):
             assert isinstance(branch, nn.BatchNorm2D)
             input_dim = self.ch_in if kernel_size == 1 else 1
             kernel_value = paddle.zeros(
-                shape=[self.ch_in, input_dim, kernel_size, kernel_size],
-                dtype='float32')
+                shape=[self.ch_in, input_dim, kernel_size, kernel_size], dtype="float32"
+            )
             if kernel_size > 1:
                 for i in range(self.ch_in):
-                    kernel_value[i, i % input_dim, (kernel_size - 1) // 2, (
-                        kernel_size - 1) // 2] = 1
+                    kernel_value[
+                        i, i % input_dim, (kernel_size - 1) // 2, (kernel_size - 1) // 2
+                    ] = 1
             elif kernel_size == 1:
                 for i in range(self.ch_in):
                     kernel_value[i, i % input_dim, 0, 0] = 1

@@ -1,15 +1,15 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved. 
-#   
-# Licensed under the Apache License, Version 2.0 (the "License");   
-# you may not use this file except in compliance with the License.  
-# You may obtain a copy of the License at   
-#   
-#     http://www.apache.org/licenses/LICENSE-2.0    
-#   
-# Unless required by applicable law or agreed to in writing, software   
-# distributed under the License is distributed on an "AS IS" BASIS, 
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  
-# See the License for the specific language governing permissions and   
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
 # limitations under the License.
 """
 This code is borrow from https://github.com/xingyizhou/CenterTrack/blob/master/src/tools/eval_kitti_track/munkres.py
@@ -17,7 +17,7 @@ This code is borrow from https://github.com/xingyizhou/CenterTrack/blob/master/s
 
 import sys
 
-__all__ = ['Munkres', 'make_cost_matrix']
+__all__ = ["Munkres", "make_cost_matrix"]
 
 
 class Munkres:
@@ -44,6 +44,7 @@ class Munkres:
         Please use the module function ``make_cost_matrix()``.
         """
         import munkres
+
         return munkres.make_cost_matrix(profit_matrix, inversion_function)
 
     make_cost_matrix = staticmethod(make_cost_matrix)
@@ -125,7 +126,7 @@ class Munkres:
             3: self.__step3,
             4: self.__step4,
             5: self.__step5,
-            6: self.__step6
+            6: self.__step6,
         }
 
         while not done:
@@ -180,9 +181,11 @@ class Munkres:
         n = self.n
         for i in range(n):
             for j in range(n):
-                if (self.C[i][j] == 0) and \
-                   (not self.col_covered[j]) and \
-                   (not self.row_covered[i]):
+                if (
+                    (self.C[i][j] == 0)
+                    and (not self.col_covered[j])
+                    and (not self.row_covered[i])
+                ):
                     self.marked[i][j] = 1
                     self.col_covered[j] = True
                     self.row_covered[i] = True
@@ -317,9 +320,11 @@ class Munkres:
         while not done:
             j = 0
             while True:
-                if (self.C[i][j] == 0) and \
-                   (not self.row_covered[i]) and \
-                   (not self.col_covered[j]):
+                if (
+                    (self.C[i][j] == 0)
+                    and (not self.row_covered[i])
+                    and (not self.col_covered[j])
+                ):
                     row = i
                     col = j
                     done = True

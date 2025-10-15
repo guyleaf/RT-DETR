@@ -1,39 +1,36 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved. 
-#   
-# Licensed under the Apache License, Version 2.0 (the "License");   
-# you may not use this file except in compliance with the License.  
-# You may obtain a copy of the License at   
-#   
-#     http://www.apache.org/licenses/LICENSE-2.0    
-#   
-# Unless required by applicable law or agreed to in writing, software   
-# distributed under the License is distributed on an "AS IS" BASIS, 
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  
-# See the License for the specific language governing permissions and   
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
 # limitations under the License.
 
 # The code is based on:
 # https://github.com/open-mmlab/mmdetection/blob/master/mmdet/models/losses/varifocal_loss.py
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
+
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+
 from ppdet.core.workspace import register, serializable
 from ppdet.modeling import ops
 
-__all__ = ['VarifocalLoss']
+__all__ = ["VarifocalLoss"]
 
 
-def varifocal_loss(pred,
-                   target,
-                   alpha=0.75,
-                   gamma=2.0,
-                   iou_weighted=True,
-                   use_sigmoid=True):
+def varifocal_loss(
+    pred, target, alpha=0.75, gamma=2.0, iou_weighted=True, use_sigmoid=True
+):
     """`Varifocal Loss <https://arxiv.org/abs/2008.13367>`_
 
     Args:
@@ -57,20 +54,21 @@ def varifocal_loss(pred,
         pred_new = pred
     target = target.cast(pred.dtype)
     if iou_weighted:
-        focal_weight = target * (target > 0.0).cast('float32') + \
-            alpha * (pred_new - target).abs().pow(gamma) * \
-            (target <= 0.0).cast('float32')
+        focal_weight = target * (target > 0.0).cast("float32") + alpha * (
+            pred_new - target
+        ).abs().pow(gamma) * (target <= 0.0).cast("float32")
     else:
-        focal_weight = (target > 0.0).cast('float32') + \
-            alpha * (pred_new - target).abs().pow(gamma) * \
-            (target <= 0.0).cast('float32')
+        focal_weight = (target > 0.0).cast("float32") + alpha * (
+            pred_new - target
+        ).abs().pow(gamma) * (target <= 0.0).cast("float32")
 
     if use_sigmoid:
-        loss = F.binary_cross_entropy_with_logits(
-            pred, target, reduction='none') * focal_weight
+        loss = (
+            F.binary_cross_entropy_with_logits(pred, target, reduction="none")
+            * focal_weight
+        )
     else:
-        loss = F.binary_cross_entropy(
-            pred, target, reduction='none') * focal_weight
+        loss = F.binary_cross_entropy(pred, target, reduction="none") * focal_weight
         loss = loss.sum(axis=1)
     return loss
 
@@ -78,13 +76,15 @@ def varifocal_loss(pred,
 @register
 @serializable
 class VarifocalLoss(nn.Layer):
-    def __init__(self,
-                 use_sigmoid=True,
-                 alpha=0.75,
-                 gamma=2.0,
-                 iou_weighted=True,
-                 reduction='mean',
-                 loss_weight=1.0):
+    def __init__(
+        self,
+        use_sigmoid=True,
+        alpha=0.75,
+        gamma=2.0,
+        iou_weighted=True,
+        reduction="mean",
+        loss_weight=1.0,
+    ):
         """`Varifocal Loss <https://arxiv.org/abs/2008.13367>`_
 
         Args:
@@ -130,23 +130,23 @@ class VarifocalLoss(nn.Layer):
             alpha=self.alpha,
             gamma=self.gamma,
             iou_weighted=self.iou_weighted,
-            use_sigmoid=self.use_sigmoid)
+            use_sigmoid=self.use_sigmoid,
+        )
 
         if weight is not None:
             loss = loss * weight
         if avg_factor is None:
-            if self.reduction == 'none':
+            if self.reduction == "none":
                 return loss
-            elif self.reduction == 'mean':
+            elif self.reduction == "mean":
                 return loss.mean()
-            elif self.reduction == 'sum':
+            elif self.reduction == "sum":
                 return loss.sum()
         else:
             # if reduction is mean, then average the loss by avg_factor
-            if self.reduction == 'mean':
+            if self.reduction == "mean":
                 loss = loss.sum() / avg_factor
             # if reduction is 'none', then do nothing, otherwise raise an error
-            elif self.reduction != 'none':
-                raise ValueError(
-                    'avg_factor can not be used with reduction="sum"')
+            elif self.reduction != "none":
+                raise ValueError('avg_factor can not be used with reduction="sum"')
         return loss

@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import paddle
-import paddle.nn.functional as F
 import paddle.nn as nn
+import paddle.nn.functional as F
+
 from ppdet.core.workspace import register
 
-__all__ = ['FocalLoss', 'Weighted_FocalLoss']
+__all__ = ["FocalLoss", "Weighted_FocalLoss"]
+
 
 @register
 class FocalLoss(nn.Layer):
@@ -32,20 +32,16 @@ class FocalLoss(nn.Layer):
         gamma (float): parameter gamma in Focal Loss
         loss_weight (float): final loss will be multiplied by this
     """
-    def __init__(self,
-                 use_sigmoid=True,
-                 alpha=0.25,
-                 gamma=2.0,
-                 loss_weight=1.0):
+
+    def __init__(self, use_sigmoid=True, alpha=0.25, gamma=2.0, loss_weight=1.0):
         super(FocalLoss, self).__init__()
-        assert use_sigmoid == True, \
-            'Focal Loss only supports sigmoid at the moment'
+        assert use_sigmoid == True, "Focal Loss only supports sigmoid at the moment"
         self.use_sigmoid = use_sigmoid
         self.alpha = alpha
         self.gamma = gamma
         self.loss_weight = loss_weight
 
-    def forward(self, pred, target, reduction='none'):
+    def forward(self, pred, target, reduction="none"):
         """forward function.
         Args:
             pred (Tensor): logits of class prediction, of shape (N, num_classes)
@@ -53,11 +49,11 @@ class FocalLoss(nn.Layer):
             reduction (str): the way to reduce loss, one of (none, sum, mean)
         """
         num_classes = pred.shape[1]
-        target = F.one_hot(target, num_classes+1).cast(pred.dtype)
+        target = F.one_hot(target, num_classes + 1).cast(pred.dtype)
         target = target[:, :-1].detach()
         loss = F.sigmoid_focal_loss(
-            pred, target, alpha=self.alpha, gamma=self.gamma,
-            reduction=reduction)
+            pred, target, alpha=self.alpha, gamma=self.gamma, reduction=reduction
+        )
         return loss * self.loss_weight
 
 
@@ -70,37 +66,35 @@ class Weighted_FocalLoss(FocalLoss):
         gamma (float): parameter gamma in Focal Loss
         loss_weight (float): final loss will be multiplied by this
     """
-    def __init__(self,
-                 use_sigmoid=True,
-                 alpha=0.25,
-                 gamma=2.0,
-                 loss_weight=1.0,
-                 reduction="mean"):
+
+    def __init__(
+        self, use_sigmoid=True, alpha=0.25, gamma=2.0, loss_weight=1.0, reduction="mean"
+    ):
         super(FocalLoss, self).__init__()
-        assert use_sigmoid == True, \
-            'Focal Loss only supports sigmoid at the moment'
+        assert use_sigmoid == True, "Focal Loss only supports sigmoid at the moment"
         self.use_sigmoid = use_sigmoid
         self.alpha = alpha
         self.gamma = gamma
         self.loss_weight = loss_weight
         self.reduction = reduction
 
-    def forward(self, pred, target, weight=None, avg_factor=None, reduction_override=None):
+    def forward(
+        self, pred, target, weight=None, avg_factor=None, reduction_override=None
+    ):
         """forward function.
         Args:
             pred (Tensor): logits of class prediction, of shape (N, num_classes)
             target (Tensor): target class label, of shape (N, )
             reduction (str): the way to reduce loss, one of (none, sum, mean)
         """
-        assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
+        assert reduction_override in (None, "none", "mean", "sum")
+        reduction = reduction_override if reduction_override else self.reduction
         num_classes = pred.shape[1]
         target = F.one_hot(target, num_classes + 1).astype(pred.dtype)
         target = target[:, :-1].detach()
         loss = F.sigmoid_focal_loss(
-            pred, target, alpha=self.alpha, gamma=self.gamma,
-            reduction='none')
+            pred, target, alpha=self.alpha, gamma=self.gamma, reduction="none"
+        )
 
         if weight is not None:
             if weight.shape != loss.shape:
@@ -120,19 +114,19 @@ class Weighted_FocalLoss(FocalLoss):
 
         # if avg_factor is not specified, just reduce the loss
         if avg_factor is None:
-            if reduction == 'mean':
+            if reduction == "mean":
                 loss = loss.mean()
-            elif reduction == 'sum':
+            elif reduction == "sum":
                 loss = loss.sum()
         else:
             # if reduction is mean, then average the loss by avg_factor
-            if reduction == 'mean':
+            if reduction == "mean":
                 # Avoid causing ZeroDivisionError when avg_factor is 0.0,
                 # i.e., all labels of an image belong to ignore index.
                 eps = 1e-10
                 loss = loss.sum() / (avg_factor + eps)
             # if reduction is 'none', then do nothing, otherwise raise an error
-            elif reduction != 'none':
+            elif reduction != "none":
                 raise ValueError('avg_factor can not be used with reduction="sum"')
 
         return loss * self.loss_weight

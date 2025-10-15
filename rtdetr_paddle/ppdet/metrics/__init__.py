@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import metrics
-
+from . import metrics, mot_metrics
 from .metrics import *
+from .mot_metrics import *
 from .pose3d_metrics import *
 
-from . import mot_metrics
-from .mot_metrics import *
 __all__ = metrics.__all__ + mot_metrics.__all__
 
 from . import mcmot_metrics
 from .mcmot_metrics import *
+
 __all__ = metrics.__all__ + mcmot_metrics.__all__
