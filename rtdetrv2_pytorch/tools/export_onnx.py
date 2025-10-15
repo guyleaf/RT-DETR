@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 import torch
 import torch.nn as nn
-from rtdetrv2.core import YAMLConfig
+from rtdetrv2.core import YAMLConfig, yaml_utils
 from rtdetrv2.misc import import_modules
 
 
@@ -15,7 +15,19 @@ def main(
     args,
 ):
     """main"""
-    cfg = YAMLConfig(args.config, resume=args.resume)
+    update_dict = yaml_utils.parse_cli(args.update) if args.update else {}
+    update_dict.update(
+        {
+            k: v
+            for k, v in args.__dict__.items()
+            if k
+            not in [
+                "update",
+            ]
+            and v is not None
+        }
+    )
+    cfg = YAMLConfig(args.config, **update_dict)
 
     if args.resume:
         checkpoint = torch.load(args.resume, map_location="cpu")
@@ -125,6 +137,7 @@ if __name__ == "__main__":
         default=[],
         help="preload modules before execution",
     )
+    parser.add_argument("--update", "-u", nargs="+", help="update yaml config")
 
     args = parser.parse_args()
 
