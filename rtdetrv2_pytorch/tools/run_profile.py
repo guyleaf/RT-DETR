@@ -12,7 +12,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from typing import Any, Dict, List, Optional
 
 from rtdetrv2.core import YAMLConfig, yaml_utils
-from rtdetrv2.misc import import_modules
 
 __all__ = ["profile_stats"]
 
@@ -92,18 +91,9 @@ if __name__ == "__main__":
         help="device",
     )
     parser.add_argument(
-        "--preloads",
-        type=str,
-        nargs="*",
-        default=[],
-        help="preload modules before execution",
-    )
-    parser.add_argument(
         "-u", "--update", nargs="+", help="Update yaml config from command line."
     )
     args = parser.parse_args()
-
-    import_modules(args.preloads)
 
     update_dict = yaml_utils.parse_cli(args.update) if args.update else {}
     update_dict.update(
