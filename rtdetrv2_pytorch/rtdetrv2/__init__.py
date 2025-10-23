@@ -2,3 +2,6 @@
 
 # for register purpose
 from . import data, nn, optim, zoo
+from .misc.env import setup_environment
+
+setup_environment()
