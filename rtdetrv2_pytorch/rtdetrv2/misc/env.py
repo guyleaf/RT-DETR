@@ -4,11 +4,6 @@ import os
 import sys
 
 
-def import_modules(modules: list[str]):
-    for module in modules:
-        importlib.import_module(module)
-
-
 # from https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
 def _import_file(module_name, file_path, make_importable=False):
     spec = importlib.util.spec_from_file_location(module_name, file_path)
