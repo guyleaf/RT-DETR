@@ -104,7 +104,6 @@ def train_one_epoch(
             sys.exit(1)
 
         # collect other values for logging
-        dist_utils.all_reduce(total_norm)
         loss_dict_reduced["grad_norm"] = total_norm
 
         metric_logger.update(loss=loss_value, **loss_dict_reduced)
