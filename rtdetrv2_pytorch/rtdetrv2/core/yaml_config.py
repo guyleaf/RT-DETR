@@ -1,6 +1,7 @@
 """Copyright(c) 2023 lyuwenyu. All Rights Reserved."""
 
 import copy
+import os
 import re
 
 import torch
@@ -10,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from ._config import BaseConfig
 from .workspace import create
-from .yaml_utils import load_config, merge_config, merge_dict
+from .yaml_utils import dump_config, load_config, merge_config, merge_dict
 
 
 class YAMLConfig(BaseConfig):
@@ -210,3 +211,9 @@ class YAMLConfig(BaseConfig):
         loader = create(name, global_cfg, batch_size=bs)
         loader.shuffle = self.yaml_cfg[name].get("shuffle", False)
         return loader
+
+    def save(self):
+        assert self.output_dir is not None, "output_dir must be not None"
+        os.makedirs(self.output_dir, exist_ok=True)
+        path = os.path.join(self.output_dir, "config.yml")
+        dump_config(self.yaml_cfg, path)
