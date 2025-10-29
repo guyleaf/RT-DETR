@@ -2,7 +2,7 @@
 
 import copy
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import yaml
 
@@ -10,6 +10,7 @@ from .workspace import GLOBAL_CONFIG
 
 __all__ = [
     "load_config",
+    "dump_config",
     "merge_config",
     "merge_dict",
     "parse_cli",
@@ -43,6 +44,14 @@ def load_config(file_path, cfg=dict()):
                 merge_dict(cfg, base_cfg)
 
     return merge_dict(cfg, file_cfg)
+
+
+def dump_config(cfg, file_path):
+    _, ext = os.path.splitext(file_path)
+    assert ext in [".yml", ".yaml"], "only support yaml files"
+
+    with open(file_path, "w") as f:
+        yaml.dump(cfg, f, Dumper=yaml.Dumper, sort_keys=False)
 
 
 def merge_dict(dct, another_dct, inplace=True) -> Dict:

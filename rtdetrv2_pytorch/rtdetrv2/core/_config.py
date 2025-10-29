@@ -1,7 +1,8 @@
 """Copyright(c) 2023 lyuwenyu. All Rights Reserved."""
 
+import os
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Callable
 
 import torch
 import torch.nn as nn
@@ -10,6 +11,8 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
+
+from .json_utils import dump_config
 
 __all__ = [
     "BaseConfig",
@@ -315,3 +318,13 @@ class BaseConfig(object):
             if not k.startswith("_"):
                 s += f"{k}: {v}\n"
         return s
+
+    def save(self):
+        assert self.output_dir is not None, "output_dir must be not None"
+        os.makedirs(self.output_dir, exist_ok=True)
+        path = os.path.join(self.output_dir, "config.json")
+        cfg = {}
+        for k, v in self.__dict__.items():
+            if not k.startswith("_"):
+                cfg[k] = v
+        dump_config(cfg, path)
