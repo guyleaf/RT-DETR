@@ -36,8 +36,9 @@ def main(
     )
 
     cfg = YAMLConfig(args.config, **update_dict)
-    cfg.save()
     print("cfg: ", cfg.__dict__)
+    if dist_utils.is_main_process():
+        cfg.save()
 
     solver = TASKS[cfg.yaml_cfg["task"]](cfg)
 
