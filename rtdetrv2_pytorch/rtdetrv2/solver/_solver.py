@@ -61,7 +61,7 @@ class BaseSolver(object):
         if self.writer:
             atexit.register(self.writer.close)
             if dist_utils.is_main_process():
-                self.writer.add_text(f"config", "{:s}".format(cfg.__repr__()), 0)
+                self.writer.add_text("config", "{:s}".format(cfg.__repr__()), 0)
 
     def cleanup(
         self,
@@ -131,7 +131,7 @@ class BaseSolver(object):
         # TODO
         if "last_epoch" in state:
             self.last_epoch = state["last_epoch"]
-            print("Load last_epoch")
+            print(f"Load last_epoch: {self.last_epoch}")
 
         for k, v in self.__dict__.items():
             if hasattr(v, "load_state_dict") and k in state:
