@@ -41,9 +41,10 @@ def profile_stats(
     is_training = model.training
 
     model.train()
-    num_params = sum([p.numel() for p in model.parameters() if p.requires_grad])
+    num_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     model.eval()
+    num_params = sum(p.numel() for p in model.parameters())
 
     if data is None:
         dtype = next(model.parameters()).dtype
@@ -88,12 +89,18 @@ def profile_stats(
 
     if verbose:
         print(info)
-        print(f"Total number of trainable parameters: {num_params}")
+        print(f"Total number of parameters: {num_params}")
+        print(f"Total number of trainable parameters: {num_trainable_params}")
         print(
             f"Total number of flops: {num_flops * flops_scale:.3f}{flops_header} with {shape}"
         )
 
-    return {"n_parameters": num_params, "n_flops": num_flops, "info": info}
+    return {
+        "n_parameters": num_params,
+        "n_trainable_parameters": num_trainable_params,
+        "n_flops": num_flops,
+        "info": info,
+    }
 
 
 if __name__ == "__main__":
