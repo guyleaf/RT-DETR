@@ -4,7 +4,7 @@ import functools
 import importlib
 import inspect
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 GLOBAL_CONFIG = defaultdict(dict)
 
@@ -148,7 +148,7 @@ def create(type_or_name, global_cfg=GLOBAL_CONFIG, **kwargs):
 
         elif isinstance(_k, dict):
             if "type" not in _k.keys():
-                raise ValueError(f"Missing inject for `type` style.")
+                raise ValueError("Missing inject for `type` style.")
 
             _type = str(_k["type"])
             if _type not in global_cfg:
@@ -166,7 +166,7 @@ def create(type_or_name, global_cfg=GLOBAL_CONFIG, **kwargs):
             module_kwargs[k] = create(name, global_cfg)
 
         else:
-            raise ValueError(f"Inject does not support {_k}")
+            module_kwargs[k] = _k
 
     # TODO hard code
     module_kwargs = {k: v for k, v in module_kwargs.items() if not k.startswith("_")}
