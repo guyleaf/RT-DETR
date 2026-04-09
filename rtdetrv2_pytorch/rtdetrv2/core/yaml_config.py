@@ -216,4 +216,9 @@ class YAMLConfig(BaseConfig):
         assert self.output_dir is not None, "output_dir must be not None"
         os.makedirs(self.output_dir, exist_ok=True)
         path = os.path.join(self.output_dir, "config.yml")
-        dump_config(self.yaml_cfg, path)
+        cfg = copy.deepcopy(self.yaml_cfg)
+        # merge the attributes modified during runtime
+        for k, v in self.__dict__.items():
+            if not k.startswith("_"):
+                cfg[k] = v
+        dump_config(cfg, path)
