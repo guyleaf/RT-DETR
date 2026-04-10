@@ -219,6 +219,6 @@ class YAMLConfig(BaseConfig):
         cfg = copy.deepcopy(self.yaml_cfg)
         # merge the attributes modified during runtime
         for k, v in self.__dict__.items():
-            if not k.startswith("_"):
+            if not k.startswith("_") and k != "yaml_cfg":
                 cfg[k] = v
         dump_config(cfg, path)
